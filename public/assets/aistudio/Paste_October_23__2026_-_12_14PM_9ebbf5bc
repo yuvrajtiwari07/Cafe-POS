@@ -1,0 +1,1920 @@
+
+Yuvraj Tiwari
+email@example.com
+
+Items:
+
+Cold Coffee     2 × ₹120     ₹240
+Veg Sandwich   1 × ₹150     ₹150
+
+Subtotal
+Discount
+Tax
+TOTAL
+
+Payment:
+
+UPI / CASH / CARD
+
+If:
+
+payment = UPI
+AND
+includeQr = true
+
+print QR.
+
+Otherwise:
+
+NO QR.
+
+Footer:
+
+Thank you!
+
+Optional configurable receipt footer.
+
+---
+
+# 31. THERMAL PRINTING
+
+Support:
+
+58mm
+80mm
+
+Create thermal-optimized receipt CSS.
+
+Also create realistic browser receipt preview.
+
+Printing approaches:
+
+1. Browser/system print
+2. Web Bluetooth ESC/POS where browser/device support permits
+
+Important:
+
+Web Bluetooth is not universally available, especially across all iOS/browser combinations.
+
+Feature-detect it.
+
+If unavailable:
+
+show:
+
+"Bluetooth thermal printing isn't supported by this browser. Use System Print."
+
+Never make the entire POS dependent on Web Bluetooth.
+
+ESC/POS printer settings:
+
+Printer Name
+Paper Width
+Characters per line
+Auto Cut supported
+Feed after print
+Print logo
+Print QR
+
+Build an ESC/POS byte generator.
+
+Support:
+
+text
+alignment
+bold
+line feeds
+separator lines
+QR where printer supports it
+cut command where supported
+
+Handle connection failures gracefully.
+
+---
+
+# 32. REPRINT
+
+Transaction details:
+
+REPRINT RECEIPT
+
+Reprints must use historical transaction snapshots.
+
+Do not modify inventory during a reprint.
+
+Optionally print:
+
+*** DUPLICATE ***
+
+on reprinted receipts.
+
+---
+
+# 33. TRANSACTION HISTORY
+
+Display:
+
+Receipt #
+Date
+Time
+Cashier
+Amount
+Payment
+Status
+
+Filters:
+
+Today
+Yesterday
+Date Range
+Cashier
+Payment Mode
+Status
+
+Search:
+
+receipt number
+item
+cashier
+
+Open transaction for details and reprint.
+
+---
+
+# 34. STAFF MANAGEMENT
+
+OWNER page:
+
+STAFF
+
+Sections:
+
+Pending Requests
+Active Staff
+Removed Staff
+
+Pending card:
+
+Google avatar
+Name
+Email
+Requested time
+
+APPROVE
+DECLINE
+
+When approving allow role:
+
+Cashier
+Manager
+
+Active:
+
+Name
+Email
+Role
+Joined At
+Last Active if implemented
+
+Actions:
+
+Change Role
+Remove
+
+Removal confirmation:
+
+"Remove Rahul?"
+
+"Rahul will immediately lose access to this restaurant."
+
+REMOVE STAFF
+
+Owner cannot accidentally remove themselves through this interface.
+
+---
+
+# 35. STAFF PERFORMANCE
+
+Reports -> Staff Performance
+
+Show:
+
+Cashier
+Orders
+Gross Sales
+Discounts
+Refunds
+Net Sales
+Cash
+UPI
+Card
+Average Bill
+
+Example:
+
+Yuvraj
+42 orders
+₹18,240 net sales
+
+Rahul
+28 orders
+₹10,540 net sales
+
+Click staff member:
+
+show their transaction/work log.
+
+Do not treat raw sales totals as a definitive measure of employee quality; present it as operational sales attribution.
+
+---
+
+# 36. REPORTS
+
+Implement:
+
+Daily Sales Report
+Payment Report
+Item Sales Report
+Category Sales Report
+Staff Sales Report
+Inventory Consumption Report
+Low Stock Report
+Wastage Report
+Tax Report
+Z Report
+
+Z Report should include:
+
+Date
+Opening/closing period where applicable
+Total Orders
+Gross Sales
+Discount
+Refund
+Net Sales
+Cash
+UPI
+Card
+Tax
+Top Items
+Staff Breakdown
+
+Provide print/export options.
+
+---
+
+# 37. CSV EXPORT
+
+Export transaction data.
+
+Columns:
+
+Receipt Number
+Date
+Time
+Cashier Name
+Cashier Email
+Payment Mode
+Subtotal
+Discount
+Tax
+Total
+Status
+
+For detailed exports optionally include item-level rows.
+
+Inventory movement export:
+
+Date
+Inventory Item
+Movement Type
+Quantity
+Unit
+Related Order
+User
+Note
+
+---
+
+# 38. RESTAURANT SETTINGS
+
+Sections:
+
+GENERAL
+
+Restaurant Name
+Phone
+Address
+Logo
+GSTIN
+FSSAI
+
+PAYMENTS
+
+UPI ID
+Merchant Name
+Uploaded QR
+
+TAX
+
+Enable Tax
+Tax Name
+Tax %
+Prices include tax yes/no
+
+RECEIPT
+
+58mm / 80mm
+Header
+Footer
+Show Logo
+Show Cashier
+Show GST
+Receipt Prefix
+
+INVENTORY
+
+STRICT / WARNING / TRACK ONLY
+
+STAFF
+
+Join Code
+Regenerate Join Code
+
+PRINTER
+
+Bluetooth printer settings
+
+DANGER ZONE
+
+Clear Menu
+
+Do NOT provide an easy accidental "delete all restaurant data" action.
+
+---
+
+# 39. FIRESTORE DATA MODEL
+
+Design a clean scalable Firestore schema.
+
+Suggested conceptual structure:
+
+users/{uid}
+
+restaurants/{restaurantId}
+
+restaurants/{restaurantId}/members/{uid}
+
+restaurants/{restaurantId}/joinRequests/{requestId}
+
+restaurants/{restaurantId}/categories/{categoryId}
+
+restaurants/{restaurantId}/menuItems/{itemId}
+
+restaurants/{restaurantId}/inventory/{inventoryItemId}
+
+restaurants/{restaurantId}/recipes/{recipeId}
+
+restaurants/{restaurantId}/orders/{orderId}
+
+restaurants/{restaurantId}/transactions/{transactionId}
+
+restaurants/{restaurantId}/inventoryMovements/{movementId}
+
+restaurants/{restaurantId}/heldOrders/{heldOrderId}
+
+restaurants/{restaurantId}/counters/{counterId}
+
+restaurants/{restaurantId}/settings/{settingId}
+
+Use this as a starting point, but improve it where required.
+
+---
+
+# 40. IMPORTANT DATA MODEL DETAILS
+
+Restaurant:
+
+restaurantId
+name
+phone
+address
+ownerId
+joinCode
+createdAt
+updatedAt
+
+Membership:
+
+uid
+role
+status
+name
+email
+photoURL
+joinedAt
+
+Menu Item:
+
+itemId
+name
+categoryId
+price
+foodType
+emoji
+imageUrl
+inStock
+createdAt
+updatedAt
+
+Recipe:
+
+menuItemId
+
+components:
+[
+ {
+   inventoryItemId,
+   quantity,
+   unit
+ }
+]
+
+Inventory Item:
+
+inventoryItemId
+name
+unit
+currentStock
+minimumStock
+costPerUnit
+category
+
+Do not duplicate data unnecessarily unless intentionally creating immutable historical snapshots.
+
+---
+
+# 41. SECURITY RULES
+
+Write actual Firestore Security Rules.
+
+Requirements:
+
+Unauthenticated users cannot access restaurant private data.
+
+Approved members can only access restaurants they belong to.
+
+Cashiers cannot:
+
+approve members
+remove members
+regenerate join code
+modify owner-only settings
+
+Managers get configured management permissions.
+
+Only owner can perform critical membership/security operations.
+
+Users cannot simply modify their own Firestore membership document to become owner.
+
+Client-side role checks are NOT security.
+
+Server/Firestore rules must enforce permissions.
+
+Storage rules must also restrict restaurant files.
+
+---
+
+# 42. SENSITIVE JOIN CODE HANDLING
+
+Do not make join-code lookup require public read access to all restaurant records.
+
+Create a secure lookup mechanism.
+
+A join code should reveal only the minimum information required to submit a join request.
+
+Never expose:
+
+staff lists
+transactions
+inventory
+owner private information
+restaurant internal settings
+
+to unauthenticated/non-member users.
+
+---
+
+# 43. REAL-TIME FIRESTORE
+
+Use real-time listeners where useful for:
+
+membership status
+join request status
+menu
+stock
+orders
+pending staff requests
+
+Avoid listening to huge historical datasets indefinitely.
+
+Use pagination for:
+
+transactions
+orders
+inventory movements
+
+Unsubscribe listeners when components unmount or restaurant access is revoked.
+
+---
+
+# 44. FIREBASE STORAGE
+
+Use Firebase Storage for:
+
+restaurant logo
+payment QR image
+menu item images
+temporary/required AI menu scan uploads if necessary
+
+Organize files by restaurantId.
+
+Enforce Storage security.
+
+Delete/reconcile unused images where practical.
+
+Compress oversized images before upload when appropriate.
+
+---
+
+# 45. NO LOCAL BUSINESS DATA STORAGE
+
+Do not use LocalStorage, IndexedDB, or browser databases as the authoritative source for restaurant business data.
+
+Authoritative data must live in Firebase.
+
+Temporary in-memory UI state is allowed.
+
+Firebase Auth's normal SDK session persistence is allowed.
+
+PWA caching may cache static application assets, but must NOT be treated as an offline authoritative restaurant database.
+
+Do not implement offline order creation in this version.
+
+If network is unavailable, clearly show:
+
+"You're offline. Billing is temporarily unavailable."
+
+Do not pretend a sale succeeded if it was not committed to the backend.
+
+---
+
+# 46. CONCURRENCY
+
+Assume multiple cashiers can operate simultaneously.
+
+Example:
+
+Inventory:
+
+Cold Coffee Glass = 5
+
+Cashier A sells 3.
+
+Cashier B sells 4 at nearly the same moment.
+
+With STRICT inventory enforcement, only transactions that can validly consume the available stock should commit.
+
+Use Firestore transactions or secure server-side transaction processing.
+
+Do NOT implement:
+
+read stock
+subtract locally
+write stock
+
+because that causes race conditions.
+
+---
+
+# 47. IDEMPOTENCY
+
+Checkout must be protected from:
+
+double-click
+network retry
+page lag
+client retry
+
+Generate a checkout operation ID.
+
+A given checkout operation must only be processed once.
+
+Never create duplicate:
+
+orders
+payments
+inventory deductions
+receipt numbers
+
+from one checkout action.
+
+---
+
+# 48. DATE/TIME
+
+Store timestamps in a reliable standard form using Firestore/server timestamps.
+
+Display according to restaurant timezone.
+
+Default:
+
+Asia/Kolkata
+
+Do not store dates only as formatted display strings.
+
+---
+
+# 49. MONEY
+
+Do not use floating-point calculations carelessly for money.
+
+Use integer minor units internally where practical.
+
+Example:
+
+₹120.50
+
+= 12050 paise
+
+Centralize money calculations.
+
+Ensure:
+
+subtotal
+discount
+tax
+rounding
+total
+
+always produce deterministic results.
+
+---
+
+# 50. RESPONSIVE DESIGN
+
+Design desktop and mobile separately where necessary.
+
+Desktop:
+
+sidebar
+large POS grid
+persistent cart panel
+
+Tablet:
+
+collapsible sidebar
+optimized touch targets
+
+Mobile:
+
+bottom navigation
+full-width product cards/grid
+sticky search/category controls
+cart drawer/bottom sheet
+large checkout button
+
+Minimum comfortable touch target approximately 44px.
+
+Avoid tiny icons.
+
+No horizontal overflow.
+
+---
+
+# 51. VISUAL DESIGN
+
+Create a modern professional restaurant SaaS interface.
+
+Style:
+
+clean
+minimal
+fast
+professional
+slightly premium
+
+Use:
+
+rounded cards
+subtle shadows
+clear spacing
+high readability
+good visual hierarchy
+
+Do not overuse gradients.
+
+Support:
+
+Light Mode
+Dark Mode
+
+Use accessible contrast.
+
+Use skeleton loaders rather than blank pages.
+
+Use toast notifications for successful operations.
+
+Use confirmation dialogs for destructive actions.
+
+---
+
+# 52. MOBILE POS UX
+
+On mobile:
+
+Header:
+
+Restaurant Name
+User Avatar
+
+Search
+
+Horizontal category selector
+
+2-column product grid where screen size allows.
+
+Bottom sticky bar:
+
+🛒 3 items | ₹540
+
+VIEW CART
+
+Cart opens as bottom sheet.
+
+Bottom:
+
+PAY ₹540
+
+Checkout must be comfortably usable one-handed.
+
+---
+
+# 53. EMPTY STATES
+
+Design proper empty states.
+
+Menu:
+
+"No dishes yet"
+
+[Add Dish]
+[Scan Menu with AI]
+
+Inventory:
+
+"No inventory items yet"
+
+[Add Inventory Item]
+
+Orders:
+
+"No orders today"
+
+Staff:
+
+"No pending requests"
+
+Never populate fake restaurant data in production.
+
+---
+
+# 54. LOADING AND ERRORS
+
+Every asynchronous operation needs:
+
+loading
+success
+error
+
+Examples:
+
+Creating restaurant...
+Scanning menu...
+Completing payment...
+Printing...
+Updating stock...
+
+Human-friendly errors.
+
+Never leave buttons permanently disabled after a failed operation.
+
+Prevent duplicate submissions while an operation is in progress.
+
+---
+
+# 55. CONFIRMATION DIALOGS
+
+Require confirmation for:
+
+Delete Dish
+Clear Menu
+Remove Staff
+Void Order
+Refund
+Inventory Adjustment
+Regenerate Staff Code
+
+Show consequences.
+
+---
+
+# 56. AUDITABILITY
+
+Important owner/admin operations should be attributable.
+
+Record relevant audit information for:
+
+staff approval
+staff removal
+role change
+manual stock adjustment
+wastage
+refund
+void
+settings/security changes
+
+Store:
+
+actor UID
+actor name
+action
+target
+timestamp
+relevant metadata
+
+Do not store sensitive secrets in logs.
+
+---
+
+# 57. PERFORMANCE
+
+Optimize Firestore usage.
+
+Avoid:
+
+fetching entire transaction history on dashboard load
+one listener per product when one collection listener works
+unbounded queries
+unnecessary repeated reads
+
+Use:
+
+indexes
+pagination
+batched reads/writes where appropriate
+Firestore transactions
+memoized selectors/components where useful
+
+---
+
+# 58. REQUIRED INDEXES
+
+Identify Firestore composite indexes required by queries.
+
+Provide the necessary Firebase index configuration.
+
+Examples could include:
+
+transactions by restaurant/date/payment mode
+orders by status/date
+inventory movements by item/date
+staff performance queries
+
+Design reports to avoid unreasonable client-side full-database scans.
+
+---
+
+# 59. PWA
+
+Make application installable where supported.
+
+Include:
+
+manifest
+icons/placeholders
+theme metadata
+service worker/static asset caching
+
+Do NOT cache sensitive restaurant API responses as an offline database.
+
+---
+
+# 60. ACCESSIBILITY
+
+Use:
+
+semantic HTML
+keyboard navigation
+labels
+ARIA where required
+visible focus states
+accessible dialogs
+sufficient contrast
+
+Status must not depend exclusively on color.
+
+Example:
+
+Do not show only a green dot.
+
+Show:
+
+VEG
+
+along with the indicator.
+
+---
+
+# 61. ROUTE PROTECTION
+
+Protected routes must verify:
+
+Firebase authentication
+restaurant membership
+membership status
+role/permission
+
+Example:
+
+/app/pos
+/app/orders
+/app/menu
+/app/inventory
+/app/staff
+/app/reports
+/app/settings
+
+If membership disappears:
+
+redirect immediately.
+
+---
+
+# 62. OWNER DATA ARCHITECTURE
+
+All restaurant operational data should exist in one configured backend.
+
+For this implementation use the restaurant owner's Firebase-backed application infrastructure.
+
+Do NOT split data randomly across Firebase, Supabase and browser storage.
+
+Design a repository/data-access layer so another backend such as Supabase could be implemented in the future without rewriting the entire UI.
+
+Example interfaces:
+
+AuthRepository
+RestaurantRepository
+MenuRepository
+InventoryRepository
+OrderRepository
+StaffRepository
+ReportRepository
+
+But implement Firebase now.
+
+---
+
+# 63. OPTIONAL BACKEND ABSTRACTION
+
+Use clean service boundaries.
+
+Example:
+
+src/services/auth
+src/services/restaurants
+src/services/menu
+src/services/inventory
+src/services/orders
+src/services/reports
+src/services/printing
+src/services/ai
+
+Components should not contain huge amounts of raw Firestore logic.
+
+---
+
+# 64. PROJECT STRUCTURE
+
+Use a maintainable structure similar to:
+
+src/
+  components/
+  pages/
+  layouts/
+  hooks/
+  contexts/
+  services/
+  repositories/
+  firebase/
+  types/
+  utils/
+  features/
+    auth/
+    onboarding/
+    pos/
+    menu/
+    inventory/
+    orders/
+    staff/
+    reports/
+    settings/
+    printing/
+
+functions/
+  src/
+    checkout/
+    join/
+    staff/
+    ai/
+    reports/
+
+firebase/
+firestore.rules
+storage.rules
+firestore.indexes.json
+
+Improve this structure if appropriate.
+
+---
+
+# 65. TYPE SAFETY
+
+Create TypeScript interfaces/types for major entities.
+
+Examples:
+
+User
+Restaurant
+RestaurantMember
+JoinRequest
+MenuItem
+Category
+Recipe
+RecipeComponent
+InventoryItem
+InventoryMovement
+Order
+OrderItem
+Transaction
+Payment
+ReceiptSettings
+RestaurantSettings
+AuditLog
+
+Avoid excessive `any`.
+
+---
+
+# 66. VALIDATION
+
+Use schema/form validation.
+
+Validate:
+
+UPI ID
+phone
+prices
+stock quantities
+recipe quantities
+tax
+email-derived account fields where applicable
+
+Prevent:
+
+negative selling price
+NaN
+invalid quantities
+empty dish name
+recipe quantity <= 0
+invalid unit conversion
+
+---
+
+# 67. TESTING
+
+Write tests for critical business logic.
+
+Especially:
+
+money calculations
+tax calculation
+discount calculation
+inventory consumption aggregation
+unit conversion
+insufficient stock
+recipe calculation
+refund inventory reversal
+permission logic
+receipt generation
+checkout idempotency
+
+Also test:
+
+2 Cold Coffees correctly consume 2× every recipe component.
+
+Multiple dishes sharing Cheese correctly aggregate consumption.
+
+Changing a recipe does not alter historical sale consumption.
+
+Reprinting does not consume inventory.
+
+Held orders do not consume inventory.
+
+Cancelled/valid reversed orders restore inventory exactly once.
+
+---
+
+# 68. DEMO / DEVELOPMENT MODE
+
+It is okay to provide development fixtures separately for developers.
+
+But production restaurant creation must start with:
+
+zero menu items
+zero inventory items
+zero transactions
+
+Never silently seed fake restaurant business data.
+
+---
+
+# 69. FIREBASE SETUP EXPERIENCE
+
+If Firebase environment variables/configuration are missing, do not crash into a blank screen.
+
+Show a developer setup screen explaining which configuration values are required.
+
+Use environment variables/configuration appropriately.
+
+Never expose server-only secrets.
+
+Provide setup documentation for:
+
+Firebase project
+Google Authentication
+Firestore
+Storage
+Cloud Functions
+Gemini
+required indexes
+security rules
+deployment
+
+---
+
+# 70. FIRST-RUN FLOW
+
+Expected flow:
+
+Google Login
+
+↓
+
+Create / Join Restaurant
+
+↓
+
+Owner creates restaurant
+
+↓
+
+Empty POS
+
+↓
+
+"Your menu is empty"
+
+↓
+
+Add manually OR Scan Menu with AI
+
+↓
+
+Create inventory
+
+↓
+
+Map recipes
+
+↓
+
+Start billing
+
+---
+
+# 71. EXAMPLE INVENTORY FLOW
+
+Owner creates:
+
+Cold Coffee Glass
+
+Unit:
+piece
+
+Current Stock:
+100
+
+Minimum:
+20
+
+Owner creates:
+
+Milk
+
+Unit:
+L
+
+Current:
+20 L
+
+Owner edits Cold Coffee recipe:
+
+Milk — 250 ml
+Cold Coffee Glass — 1 piece
+
+Customer buys:
+
+3 Cold Coffees
+
+Checkout transaction must consume:
+
+Milk:
+750 ml
+
+Glass:
+3 pieces
+
+Remaining:
+
+Milk:
+19.25 L
+
+Glass:
+97
+
+Inventory movement log:
+
+SALE_CONSUMPTION
+Milk
+-750 ml
+Order INV-2026-000001
+
+SALE_CONSUMPTION
+Cold Coffee Glass
+-3 piece
+Order INV-2026-000001
+
+---
+
+# 72. ORDER ATTRIBUTION
+
+Every completed order must capture:
+
+cashierId
+cashierName
+cashierEmail
+
+Use authenticated membership/account information.
+
+Do not allow cashier to type another employee's identity manually.
+
+Display attribution:
+
+Receipt
+Transaction History
+CSV
+Reports
+Staff Performance
+
+---
+
+# 73. OWNER VS CASHIER UI
+
+Owner:
+
+Dashboard
+POS
+Orders
+Transactions
+Menu
+Inventory
+Staff
+Reports
+Settings
+
+Cashier:
+
+POS
+Orders
+permitted Transaction History
+Profile
+
+Manager:
+
+permissions between Owner and Cashier.
+
+Do not simply hide UI.
+
+Enforce authorization at backend/security-rule level.
+
+---
+
+# 74. OFFLINE / CONNECTION STATE
+
+Show connection state.
+
+If Firestore cannot safely finalize checkout:
+
+DO NOT complete sale locally.
+
+Show:
+
+"Unable to complete sale. Check your internet connection and try again."
+
+Because this version intentionally has no offline business-data support.
+
+---
+
+# 75. PRINT PREVIEW
+
+Create:
+
+Receipt Preview
+
+Toggle:
+
+58mm
+80mm
+
+Show approximately how the thermal receipt will appear.
+
+Button:
+
+PRINT
+
+If UPI QR was requested:
+
+show it.
+
+If not:
+
+do not show it.
+
+---
+
+# 76. SEARCH
+
+POS search should search:
+
+dish name
+category where appropriate
+
+Inventory search:
+
+name
+SKU
+
+Transactions:
+
+receipt number
+cashier where practical
+
+Menu search:
+
+dish name
+category
+
+Debounce Firestore/network searches where required.
+
+---
+
+# 77. SECURITY REQUIREMENTS
+
+Do NOT:
+
+store API secrets in frontend
+trust role from client
+allow public Firestore collections containing private restaurant data
+use join code as authorization
+let client assign itself owner
+allow direct arbitrary inventory mutation
+allow cashier to change cashier attribution
+allow a receipt reprint to affect stock
+allow menu deletion to alter historical transactions
+allow current dish price changes to alter old receipts
+
+Use server timestamps for important authoritative events.
+
+---
+
+# 78. IMPORTANT EDGE CASES
+
+Handle:
+
+Owner opens POS on two devices.
+
+Two cashiers sell last stock simultaneously.
+
+Staff removed while POS is open.
+
+Dish deleted after it was sold.
+
+Dish price changes after historical sale.
+
+Recipe changes after sale.
+
+Restaurant changes UPI ID.
+
+Receipt reprinted months later.
+
+Menu scan returns duplicate dishes.
+
+Menu scan cannot determine price.
+
+User clicks Pay twice.
+
+Printer disconnects during printing.
+
+Receipt printing fails after sale successfully commits.
+
+Browser refreshes immediately after successful checkout.
+
+Cashier loses internet before checkout.
+
+Staff join request is declined.
+
+Join code regenerated while an old request already exists.
+
+Inventory item is referenced by recipes and owner tries to delete it.
+
+Category containing dishes is deleted.
+
+Refund is attempted twice.
+
+---
+
+# 79. PRINT FAILURE MUST NOT ROLLBACK A VALID SALE
+
+Payment/order completion and printing are separate.
+
+Once sale transaction is successfully committed:
+
+if printing fails:
+
+show:
+
+"Sale completed successfully, but receipt printing failed."
+
+Buttons:
+
+RETRY PRINT
+SYSTEM PRINT
+DONE
+
+Never repeat checkout simply because printer failed.
+
+Otherwise duplicate sales/inventory deductions could occur.
+
+---
+
+# 80. INVENTORY ITEM DELETION SAFETY
+
+If inventory item is currently used by recipes:
+
+do not instantly delete it.
+
+Show:
+
+"Milk is currently used in 7 menu recipes."
+
+Provide:
+
+View Recipes
+
+Require recipe mappings to be removed/replaced first, or support a carefully designed archive mechanism.
+
+Prefer archiving over destructive deletion when historical records reference an entity.
+
+---
+
+# 81. ARCHIVING
+
+For entities referenced historically, prefer:
+
+active = false
+archivedAt
+
+rather than physical deletion.
+
+Historical orders must remain readable.
+
+Menu dishes can disappear from active POS while their historical snapshots remain intact.
+
+---
+
+# 82. PAYMENT STATUS
+
+Separate:
+
+payment method
+
+from:
+
+payment status
+
+Example:
+
+paymentMethod = UPI
+
+paymentStatus = CONFIRMED
+
+Do not claim automatic UPI confirmation simply because a QR was shown.
+
+Cashier confirmation is required unless actual payment gateway verification is integrated later.
+
+---
+
+# 83. FUTURE READY DESIGN
+
+Architecture should make it possible later to add:
+
+tables
+KOT/kitchen printing
+online ordering
+multiple branches
+supplier management
+purchase orders
+barcode scanning
+GST invoice improvements
+payment gateway verification
+offline POS
+customer loyalty
+WhatsApp receipts
+expense tracking
+
+Do not implement these now unless needed structurally.
+
+Avoid overengineering the first version.
+
+---
+
+# 84. DEVELOPMENT QUALITY
+
+Code should be:
+
+modular
+readable
+typed
+maintainable
+documented where logic is non-obvious
+
+Avoid:
+
+one enormous App.tsx
+huge components
+duplicated Firebase logic
+hard-coded restaurant IDs
+hard-coded users
+hard-coded menu items
+mock production behavior
+TODO placeholders for core features
+
+---
+
+# 85. DO NOT FAKE FUNCTIONALITY
+
+This requirement is critical.
+
+Do not create buttons that look functional but only show toast messages.
+
+For every major feature:
+
+connect the actual implementation.
+
+Examples:
+
+Approve Staff must actually update membership.
+
+Remove Staff must actually revoke access.
+
+Checkout must actually create transaction and deduct inventory.
+
+AI Scan must actually call configured AI service.
+
+CSV Export must actually generate CSV.
+
+Print must actually trigger supported printing flow.
+
+If an external capability cannot work until credentials/hardware are configured, build the integration layer and clearly identify what configuration remains.
+
+---
+
+# 86. BUILD ORDER
+
+Build the application in this order:
+
+PHASE 1
+
+Project architecture
+Firebase initialization
+Authentication
+Type definitions
+Routing
+Responsive application shell
+
+PHASE 2
+
+Restaurant creation
+Restaurant joining
+Membership
+Approval
+Role permissions
+Real-time removal
+
+PHASE 3
+
+Menu
+Categories
+Empty states
+Menu CRUD
+
+PHASE 4
+
+Inventory
+Inventory movements
+Recipe/BOM mapping
+Unit conversion
+
+PHASE 5
+
+POS cart
+Held orders
+Checkout
+Atomic inventory deduction
+Receipt numbers
+Transactions
+
+PHASE 6
+
+Receipts
+UPI QR
+Browser printing
+ESC/POS printing
+
+PHASE 7
+
+Orders
+History
+Refund/void/reversal
+Reprinting
+
+PHASE 8
+
+Dashboard
+Reports
+Staff performance
+CSV exports
+
+PHASE 9
+
+Gemini menu scanner
+
+PHASE 10
+
+PWA
+Accessibility
+Testing
+Security review
+Performance review
+Deployment documentation
+
+Do not sacrifice backend correctness to rush to later phases.
+
+---
+
+# 87. BEFORE CONSIDERING THE APP COMPLETE
+
+Verify these exact scenarios manually or with automated tests.
+
+TEST A — OWNER
+
+Google login
+Create restaurant
+Receives join code
+Restaurant contains zero menu items
+
+TEST B — STAFF
+
+Google login
+Enter code
+Owner sees request
+Owner approves
+Staff automatically gets access
+
+TEST C — REMOVAL
+
+Staff has POS open
+Owner removes staff
+Staff immediately loses access
+
+TEST D — MENU
+
+Create Cold Coffee ₹120
+Set Veg
+Set In Stock
+
+TEST E — INVENTORY
+
+Create:
+
+Milk 20 L
+Coffee 2 kg
+Glass 100 pieces
+Straw 100 pieces
+
+Recipe:
+
+Milk 250 ml
+Coffee 8 g
+Glass 1
+Straw 1
+
+TEST F — SALE
+
+Sell 2 Cold Coffees.
+
+Verify:
+
+Milk -> 19.5 L
+Coffee -> 1.984 kg
+Glass -> 98
+Straw -> 98
+
+TEST G — CASHIER
+
+Receipt shows authenticated cashier name/email.
+
+Transaction shows same cashier.
+
+Staff report attributes sale correctly.
+
+TEST H — UPI
+
+Checkout using UPI.
+
+Choose YES QR.
+
+Receipt contains QR.
+
+Second order:
+
+choose NO.
+
+Receipt has no QR.
+
+TEST I — CASH
+
+Cash receipt contains no UPI QR.
+
+TEST J — REPRINT
+
+Reprint first receipt.
+
+Inventory DOES NOT change.
+
+TEST K — RECIPE CHANGE
+
+Change Cold Coffee Milk from 250ml to 300ml.
+
+Old transaction must still show/use original 250ml snapshot.
+
+New transaction consumes 300ml.
+
+TEST L — CONCURRENCY
+
+Simulate two simultaneous sales against limited stock.
+
+STRICT mode must prevent invalid negative stock.
+
+TEST M — DOUBLE CLICK
+
+Click PAY twice quickly.
+
+Only one transaction/order/inventory deduction is created.
+
+TEST N — PRINTER FAILURE
+
+Complete sale then simulate printer failure.
+
+Sale remains valid.
+
+Retrying print does not create another transaction.
+
+---
+
+# 88. FINAL DELIVERABLES
+
+Generate the complete working project including:
+
+1. Full frontend source code
+2. Firebase configuration structure
+3. Firestore schema implementation
+4. Firestore Security Rules
+5. Firebase Storage Rules
+6. Firestore indexes
+7. Required Cloud Functions/server-side logic
+8. Gemini menu scanner integration
+9. Inventory engine
+10. Checkout transaction logic
+11. UPI QR generation
+12. Receipt generator
+13. Browser print CSS
+14. ESC/POS implementation where supported
+15. PWA configuration
+16. Responsive desktop/tablet/mobile UI
+17. Tests for critical business logic
+18. `.env.example`
+19. Firebase deployment configuration
+20. README with exact setup/deployment instructions
+
+---
+
+# 89. README REQUIREMENTS
+
+README must explain:
+
+Prerequisites
+
+How to create Firebase project
+
+How to enable Google Authentication
+
+How to create Firestore database
+
+How to enable Storage
+
+How to configure Cloud Functions
+
+How to configure Gemini
+
+Which environment variables are required
+
+How to deploy Firestore rules
+
+How to deploy Storage rules
+
+How to deploy indexes
+
+How to run locally
+
+How to build production
+
+How to deploy
+
+How to test Bluetooth printer
+
+Browser compatibility limitations
+
+How restaurant/staff permissions work
+
+How inventory deduction works
+
+---
+
+# 90. EXECUTION INSTRUCTION
+
+Now build the application.
+
+Do not respond only with an architecture explanation.
+
+Create the actual project and files.
+
+Start by establishing the architecture and Firebase configuration, then implement the phases above sequentially.
+
+When a decision is not explicitly specified, choose the safest production-quality option and continue rather than blocking progress for minor decisions.
+
+Prioritize in this order:
+
+1. Data integrity
+2. Security
+3. Correct checkout/inventory behavior
+4. Reliability
+5. POS speed/usability
+6. Mobile usability
+7. Reporting
+8. Visual polish
+
+Do not replace required functionality with mock data merely to make the UI look finished.
+
+The final result should behave like a real restaurant POS that a small café or restaurant could actually operate.

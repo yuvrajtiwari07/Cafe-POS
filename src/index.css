@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@media print {
+  @page {
+    size: auto;
+    margin: 0mm;
+  }
+
+  html,
+  body {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 100% !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide all regular UI chrome */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Neutralize nested modal containers, fixed overlays, and overflow wrappers */
+  .fixed,
+  .absolute,
+  div,
+  main {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Reveal the thermal receipt and all its children */
+  #thermal-receipt-print-area,
+  #thermal-receipt-print-area *,
+  #kot-thermal-receipt,
+  #kot-thermal-receipt * {
+    visibility: visible !important;
+  }
+
+  /* Position thermal slip at top left of paper roll */
+  #thermal-receipt-print-area,
+  #kot-thermal-receipt {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 2mm 3mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
+  }
+}
+
+/* Custom scrollbars for POS touch screens */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f5ede0;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8c4b2;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #bfa590;
+}
+

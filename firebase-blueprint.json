@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "Cafe": {
+      "title": "Cafe",
+      "description": "Multi-tenant restaurant or cafe profile with staff approval and custom payment QR",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "tagline": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "address": { "type": "string", "maxLength": 200 },
+        "upiId": { "type": "string", "maxLength": 50 },
+        "paymentQrUrl": { "type": "string", "description": "Custom uploaded standee QR image or data url" },
+        "gstin": { "type": "string", "maxLength": 30 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 128 },
+        "secretCode": { "type": "string", "maxLength": 20 },
+        "memberUids": { "type": "array", "description": "Staff member UIDs authorized for this cafe" },
+        "members": { "type": "array", "description": "Detailed staff list with email, name, role" },
+        "pendingRequests": { "type": "array", "description": "Staff join requests awaiting owner approval" },
+        "openingTime": { "type": "string", "maxLength": 10, "description": "Daily opening time in 24h HH:mm format" },
+        "closingTime": { "type": "string", "maxLength": 10, "description": "Daily closing time in 24h HH:mm format (supports overnight past midnight)" },
+        "googleSpreadsheetId": { "type": "string", "maxLength": 128, "description": "Linked Google Sheets backup workbook ID" },
+        "googleSpreadsheetUrl": { "type": "string", "maxLength": 300, "description": "Direct URL to linked Google Sheets workbook" },
+        "googleSheetTitle": { "type": "string", "maxLength": 120, "description": "Display title of linked Google Sheets workbook" },
+        "lastSheetSyncedAt": { "type": "string", "maxLength": 60 },
+        "initialExpensesSeededAt": { "type": "string", "maxLength": 60 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "ownerId", "secretCode"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Dish or beverage offered on the cafe menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cafeId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string", "maxLength": 50 },
+        "price": { "type": "number" },
+        "description": { "type": "string", "maxLength": 250 },
+        "isVeg": { "type": "boolean" },
+        "isAvailable": { "type": "boolean" },
+        "popular": { "type": "boolean" },
+        "imageEmoji": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "category", "price"]
+    },
+    "Bill": {
+      "title": "Bill",
+      "description": "Customer order invoice / thermal bill record with staff attribution",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cafeId": { "type": "string", "maxLength": 128 },
+        "billNumber": { "type": "string", "maxLength": 40 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discountPercent": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "taxPercent": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "paymentMode": { "type": "string", "enum": ["upi", "cash", "card"] },
+        "includeQr": { "type": "boolean", "description": "Whether payment QR was printed on bill" },
+        "orderType": { "type": "string", "enum": ["dine-in", "takeaway", "delivery"] },
+        "tableOrToken": { "type": "string", "maxLength": 30 },
+        "customerMobile": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "enum": ["paid", "void"] },
+        "cashierId": { "type": "string", "maxLength": 128 },
+        "cashierName": { "type": "string", "maxLength": 80 },
+        "cashierEmail": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "syncedAt": { "type": "string" }
+      },
+      "required": ["billNumber", "items", "grandTotal", "paymentMode", "orderType", "status"]
+    },
+    "LedgerEntry": {
+      "title": "LedgerEntry",
+      "description": "Cash, UPI, and Credit Card expenditures, staff/partner withdrawals, and credit card top-ups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "cafeId": { "type": "string", "maxLength": 128 },
+        "kind": { "type": "string", "enum": ["expenditure", "withdrawal", "cc_topup"] },
+        "amount": { "type": "number" },
+        "paymentMode": { "type": "string", "enum": ["cash", "upi", "credit_card", "personal"] },
+        "expenseType": { "type": "string", "enum": ["running", "fixed", "initial"] },
+        "paidBy": { "type": "string", "maxLength": 60 },
+        "expenseTitle": { "type": "string", "maxLength": 120 },
+        "person": { "type": "string", "maxLength": 60 },
+        "note": { "type": "string", "maxLength": 250 },
+        "dateStr": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "createdByUid": { "type": "string", "maxLength": 128 },
+        "createdByName": { "type": "string", "maxLength": 80 }
+      },
+      "required": ["cafeId", "kind", "amount", "paymentMode", "dateStr", "createdAt"]
+    },
+    "WalletSettings": {
+      "title": "WalletSettings",
+      "description": "Opening balances for Cash Counter, UPI, and Credit Card wallets",
+      "type": "object",
+      "properties": {
+        "cash": { "type": "number" },
+        "upi": { "type": "number" },
+        "creditCard": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["cash", "upi", "creditCard"]
+    }
+  },
+  "firestore": {
+    "/cafes/{cafeId}": {
+      "schema": "Cafe",
+      "description": "Cafe and restaurant profile with staff access list and approval queue"
+    },
+    "/cafes/{cafeId}/menu/{itemId}": {
+      "schema": "MenuItem",
+      "description": "Menu items for the cafe"
+    },
+    "/cafes/{cafeId}/bills/{billId}": {
+      "schema": "Bill",
+      "description": "All customer bills and transaction records for the cafe"
+    },
+    "/cafes/{cafeId}/ledger/{entryId}": {
+      "schema": "LedgerEntry",
+      "description": "Cafe expenditures, partner withdrawals, and credit card top-up records"
+    },
+    "/cafes/{cafeId}/settings/{settingId}": {
+      "schema": "WalletSettings",
+      "description": "Wallet opening balances and operational configuration for the cafe"
+    }
+  }
+}

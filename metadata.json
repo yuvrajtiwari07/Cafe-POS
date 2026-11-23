@@ -1,0 +1,7 @@
+{
+  "name": "Corner Cafe POS & Billing",
+  "description": "Multi-platform cafe and restaurant billing POS with real-time Firebase sync, offline-first queue, and Bluetooth thermal receipt printing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

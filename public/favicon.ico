@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="128" fill="#e65c00"/>
+  <!-- Coffee Cup & Steam -->
+  <g fill="#ffffff" transform="translate(96, 96)">
+    <!-- Steam -->
+    <path d="M90 30 Q105 10 100 -10 Q95 -30 110 -50" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <path d="M160 30 Q175 10 170 -10 Q165 -30 180 -50" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <path d="M230 30 Q245 10 240 -10 Q235 -30 250 -50" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <!-- Cup Body -->
+    <path d="M40 70 L280 70 C280 210, 240 260, 160 260 C80 260, 40 210, 40 70 Z" fill="#ffffff"/>
+    <!-- Handle -->
+    <path d="M270 100 C330 100, 330 200, 260 200" stroke="#ffffff" stroke-width="24" fill="none" stroke-linecap="round"/>
+    <!-- Plate / Base -->
+    <path d="M20 280 L300 280 C310 280, 310 300, 300 300 L20 300 C10 300, 10 280, 20 280 Z" fill="#fff" opacity="0.9"/>
+    <!-- POS receipt slit -->
+    <rect x="80" y="110" width="160" height="24" rx="6" fill="#e65c00"/>
+    <rect x="95" y="150" width="130" height="12" rx="4" fill="#e65c00" opacity="0.6"/>
+    <rect x="110" y="174" width="100" height="12" rx="4" fill="#e65c00" opacity="0.6"/>
+  </g>
+</svg>
