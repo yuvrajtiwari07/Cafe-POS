@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Store,
   KeyRound,
@@ -21,17 +21,13 @@ import { Cafe, JoinRequest, StaffMember } from '../types';
 import { setActiveCafe } from '../services/storage';
 import { showToast } from '../services/toast';
 import {
-  collection,
   doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
   setDoc,
   updateDoc,
   onSnapshot,
-} from 'firebase/firestore';
-import { db, auth, loginWithGoogle, cleanFirestoreData } from '../firebase';
+  requestCafeJoin,
+} from '../database';
+import { db, auth, loginWithGoogle, cleanData } from '../database';
 
 interface CafeModalProps {
   currentCafe: Cafe;
@@ -48,6 +44,8 @@ export const CafeModal: React.FC<CafeModalProps> = ({
   user,
   isInitialSetup = false,
 }) => {
+  const joinUnsubscribe = useRef<(() => void) | null>(null);
+  useEffect(() => () => joinUnsubscribe.current?.(), []);
   const isOwner = user?.uid === currentCafe.ownerId;
 
   const [tab, setTab] = useState<'current' | 'team' | 'qr' | 'join' | 'create'>(
@@ -86,130 +84,9 @@ export const CafeModal: React.FC<CafeModalProps> = ({
     setJoinSuccess(null);
 
     try {
-      const upperCode = cleanCode.toUpperCase();
-      const cleanDigits = cleanCode.replace(/[^0-9]/g, '');
-      const formattedCode = cleanDigits ? `CAFE-${cleanDigits}` : '';
-      let cafeDocData: Cafe | null = null;
-      let cafeDocId: string | null = null;
-
-      // 1. Try search by exact secretCode
-      let snap = await getDocs(query(collection(db, 'cafes'), where('secretCode', '==', upperCode)));
-
-      // 2. If not found, try formatted CAFE-XXXX
-      if (snap.empty && formattedCode && formattedCode !== upperCode) {
-        snap = await getDocs(query(collection(db, 'cafes'), where('secretCode', '==', formattedCode)));
-      }
-
-      // 3. If not found, try raw cleanCode
-      if (snap.empty && upperCode !== cleanCode) {
-        snap = await getDocs(query(collection(db, 'cafes'), where('secretCode', '==', cleanCode)));
-      }
-
-      if (!snap.empty) {
-        cafeDocData = snap.docs[0].data() as Cafe;
-        cafeDocId = snap.docs[0].id;
-      } else {
-        // 4. Try direct lookup by Cafe ID
-        try {
-          const directDoc = await getDoc(doc(db, 'cafes', cleanCode));
-          if (directDoc.exists()) {
-            cafeDocData = directDoc.data() as Cafe;
-            cafeDocId = directDoc.id;
-          }
-        } catch {
-          // Ignore invalid doc id format
-        }
-
-        // 5. Try lookup by Cafe Name if still not found
-        if (!cafeDocData) {
-          const nameSnap = await getDocs(query(collection(db, 'cafes'), where('name', '==', cleanCode)));
-          if (!nameSnap.empty) {
-            cafeDocData = nameSnap.docs[0].data() as Cafe;
-            cafeDocId = nameSnap.docs[0].id;
-          }
-        }
-
-        // 6. Comprehensive fallback scan across available cafes
-        if (!cafeDocData) {
-          try {
-            const allSnap = await getDocs(collection(db, 'cafes'));
-            for (const docSnap of allSnap.docs) {
-              const d = docSnap.data() as Cafe;
-              const sCode = (d.secretCode || '').toUpperCase().trim();
-              const sDigits = sCode.replace(/[^0-9]/g, '');
-              const sName = (d.name || '').toLowerCase().trim();
-              if (
-                sCode === upperCode ||
-                (cleanDigits.length >= 4 && sDigits === cleanDigits) ||
-                sCode.replace(/[^A-Z0-9]/g, '') === upperCode.replace(/[^A-Z0-9]/g, '') ||
-                sName === cleanCode.toLowerCase()
-              ) {
-                cafeDocData = d;
-                cafeDocId = docSnap.id;
-                break;
-              }
-            }
-          } catch (e) {
-            console.warn('Fallback cafes scan warning', e);
-          }
-        }
-      }
-
-      if (!cafeDocData || !cafeDocId) {
-        setJoinError(
-          `No restaurant found for "${cleanCode}". Please verify the Staff Secret Code (e.g. CAFE-8821) or Cafe ID with the owner.`
-        );
-        return;
-      }
-
-      const targetCafe: Cafe = { ...cafeDocData, id: cafeDocId };
-
-      // Case A: User is already owner or approved member
-      if (targetCafe.ownerId === user.uid || targetCafe.memberUids?.includes(user.uid)) {
-        setActiveCafe(targetCafe);
-        onCafeSelected(targetCafe);
-        showToast(`Switched to "${targetCafe.name}"!`, 'success');
-        onClose();
-        return;
-      }
-
-      // Check if code entered matches the private Staff Secret Code
-      const targetDigits = (targetCafe.secretCode || '').replace(/[^0-9]/g, '');
-      const matchesSecretCode =
-        targetCafe.secretCode &&
-        (targetCafe.secretCode.toUpperCase() === upperCode ||
-          targetCafe.secretCode === cleanCode ||
-          (cleanDigits.length >= 4 && cleanDigits === targetDigits) ||
-          targetCafe.secretCode.replace(/[^A-Z0-9]/g, '') === upperCode.replace(/[^A-Z0-9]/g, ''));
-
-      if (!matchesSecretCode) {
-        setJoinError(
-          `Invalid Staff Secret Code for "${targetCafe.name}". Please obtain the correct code from the cafe owner.`
-        );
-        return;
-      }
-
-      // Valid Secret Code -> Submit Join Request for Owner Approval
-      const existingPending = targetCafe.pendingRequests || [];
-      const isAlreadyPending = existingPending.some((req) => req.uid === user.uid);
-
-      if (!isAlreadyPending) {
-        const newRequest: JoinRequest = {
-          uid: user.uid,
-          email: user.email || 'staff@example.com',
-          name: user.displayName || user.email?.split('@')[0] || 'Staff Member',
-          requestedAt: new Date().toISOString(),
-        };
-
-        const updatedPending = [...existingPending, newRequest];
-        await updateDoc(
-          doc(db, 'cafes', cafeDocId),
-          cleanFirestoreData({
-            pendingRequests: updatedPending,
-            updatedAt: new Date().toISOString(),
-          })
-        );
-      }
+      joinUnsubscribe.current?.();
+      const targetCafe = await requestCafeJoin(cleanCode);
+      const cafeDocId = targetCafe.id;
 
       setJoinSuccess(
         `Staff Code verified for "${targetCafe.name}"! Join request sent to the owner. Waiting for the owner to tap "Approve" on their device...`
@@ -228,6 +105,7 @@ export const CafeModal: React.FC<CafeModalProps> = ({
           }
         }
       });
+      joinUnsubscribe.current = unsub;
     } catch (err: any) {
       console.error('Error joining restaurant:', err);
       setJoinError(err.message || 'Error processing restaurant join request.');
@@ -240,12 +118,13 @@ export const CafeModal: React.FC<CafeModalProps> = ({
   const handleCreateNewCafe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cafeName.trim()) return;
+    if (!auth.currentUser) { showToast('Sign in before creating a restaurant.', 'warning'); return; }
 
     setIsCreating(true);
 
     try {
-      const randomCode = `CAFE-${Math.floor(1000 + Math.random() * 9000)}`;
-      const cafeId = `cafe-${Date.now()}`;
+      const randomCode = `CAFE-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
+      const cafeId = `cafe-${crypto.randomUUID()}`;
       const currentUser = auth.currentUser || user;
       const uid = currentUser?.uid || 'guest-owner';
       const email = currentUser?.email || 'owner@example.com';
@@ -280,14 +159,15 @@ export const CafeModal: React.FC<CafeModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
 
-      // Save to Firestore
+      // Save to database
       if (currentUser) {
         try {
-          await setDoc(doc(db, 'cafes', cafeId), cleanFirestoreData(newCafe));
+          await setDoc(doc(db, 'cafes', cafeId), cleanData(newCafe));
           showToast(`Restaurant "${newCafe.name}" registered to ${email}!`, 'success');
         } catch (err: any) {
-          console.error('Could not save cafe to Firestore', err);
-          showToast(`Warning: Cloud sync error (${err.message}). Saved locally.`, 'warning');
+          console.error('Could not save cafe to database', err);
+          showToast(`Could not create restaurant: ${err.message}`, 'error');
+          return;
         }
       } else {
         showToast(`Restaurant "${newCafe.name}" created locally! Sign in with Google to sync to cloud.`, 'info');
@@ -332,14 +212,14 @@ export const CafeModal: React.FC<CafeModalProps> = ({
 
     if (user) {
       try {
-        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanFirestoreData({
+        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanData({
           memberUids: updatedUids,
           members: updatedMembers,
           pendingRequests: updatedPending,
           updatedAt: new Date().toISOString(),
         }));
       } catch (err) {
-        console.warn('Could not approve member in Firestore', err);
+        console.warn('Could not approve member in database', err);
       }
     }
   };
@@ -363,12 +243,12 @@ export const CafeModal: React.FC<CafeModalProps> = ({
 
     if (user) {
       try {
-        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanFirestoreData({
+        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanData({
           pendingRequests: updatedPending,
           updatedAt: new Date().toISOString(),
         }));
       } catch (err) {
-        console.warn('Could not decline request in Firestore', err);
+        console.warn('Could not decline request in database', err);
       }
     }
   };
@@ -400,13 +280,13 @@ export const CafeModal: React.FC<CafeModalProps> = ({
 
     if (user) {
       try {
-        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanFirestoreData({
+        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanData({
           memberUids: updatedUids,
           members: updatedMembers,
           updatedAt: new Date().toISOString(),
         }));
       } catch (err) {
-        console.warn('Could not remove member in Firestore', err);
+        console.warn('Could not remove member in database', err);
       }
     }
   };
@@ -424,13 +304,13 @@ export const CafeModal: React.FC<CafeModalProps> = ({
 
     if (user) {
       try {
-        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanFirestoreData({
+        await updateDoc(doc(db, 'cafes', currentCafe.id), cleanData({
           paymentQrUrl: qrDataUrl,
           updatedAt: new Date().toISOString(),
         }));
         showToast('Payment QR updated successfully! It will now appear on thermal bills when UPI is selected.', 'success');
       } catch (err) {
-        console.warn('Could not save QR in Firestore', err);
+        console.warn('Could not save QR in database', err);
       }
     }
   };

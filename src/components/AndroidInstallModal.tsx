@@ -189,7 +189,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({ onClos
               <div>
                 <p className="font-bold">Unified Database</p>
                 <p className="text-[11px] text-stone-600">
-                  Bills, tables, and stock deduction are 100% synchronized via Firebase Firestore.
+                  Bills, tables, and stock deduction are 100% synchronized via Supabase database.
                 </p>
               </div>
             </div>

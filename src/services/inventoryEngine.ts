@@ -1,10 +1,10 @@
 import { InventoryItem, Recipe, InventoryMovement, OrderItem, InventoryUnit, MovementType } from '../types';
-import { db, cleanFirestoreData } from '../firebase';
-import { doc, collection, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, cleanData } from '../database';
+import { doc, collection, setDoc, deleteDoc } from '../database';
 
-const KEY_PREFIX_INVENTORY = 'corner_inventory_';
-const KEY_PREFIX_RECIPES = 'corner_recipes_';
-const KEY_PREFIX_MOVEMENTS = 'corner_movements_';
+const KEY_PREFIX_INVENTORY = 'billdedo_sb1_inventory_';
+const KEY_PREFIX_RECIPES = 'billdedo_sb1_recipes_';
+const KEY_PREFIX_MOVEMENTS = 'billdedo_sb1_movements_';
 
 // 1. Conversion Matrix
 // Normalizes quantities between metric sub-units (ml <-> L, g <-> kg, piece/packet)
@@ -195,24 +195,24 @@ export async function deductInventoryForOrder(
         newMovements.push(movement);
         saveMovementLocally(cafeId, movement);
 
-        // Firestore async background sync
+        // database async background sync
         if (cafeId && cafeId !== 'default-corner-cafe') {
           try {
-            setDoc(doc(db, 'cafes', cafeId, 'inventoryMovements', movement.id), cleanFirestoreData(movement)).catch(() => {});
+            setDoc(doc(db, 'cafes', cafeId, 'inventoryMovements', movement.id), cleanData(movement)).catch(() => {});
           } catch {}
         }
       }
     }
   }
 
-  // Save updated inventory locally & to Firestore
+  // Save updated inventory locally & to database
   const updatedStockList = Object.values(stockMap);
   saveLocalInventory(cafeId, updatedStockList);
 
   if (cafeId && cafeId !== 'default-corner-cafe') {
     for (const inv of updatedStockList) {
       try {
-        setDoc(doc(db, 'cafes', cafeId, 'inventory', inv.id), cleanFirestoreData(inv), { merge: true }).catch(() => {});
+        setDoc(doc(db, 'cafes', cafeId, 'inventory', inv.id), cleanData(inv), { merge: true }).catch(() => {});
       } catch {}
     }
   }
@@ -275,7 +275,7 @@ export async function reverseInventoryForOrder(
 
         if (cafeId && cafeId !== 'default-corner-cafe') {
           try {
-            setDoc(doc(db, 'cafes', cafeId, 'inventoryMovements', movement.id), cleanFirestoreData(movement)).catch(() => {});
+            setDoc(doc(db, 'cafes', cafeId, 'inventoryMovements', movement.id), cleanData(movement)).catch(() => {});
           } catch {}
         }
       }
@@ -288,7 +288,7 @@ export async function reverseInventoryForOrder(
   if (cafeId && cafeId !== 'default-corner-cafe') {
     for (const inv of updatedStockList) {
       try {
-        setDoc(doc(db, 'cafes', cafeId, 'inventory', inv.id), cleanFirestoreData(inv), { merge: true }).catch(() => {});
+        setDoc(doc(db, 'cafes', cafeId, 'inventory', inv.id), cleanData(inv), { merge: true }).catch(() => {});
       } catch {}
     }
   }

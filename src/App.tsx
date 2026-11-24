@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
-import { auth, db, testConnection, loginWithGoogle, cleanFirestoreData } from './firebase';
+import { onAuthStateChanged, User } from './auth';
+import { doc, onSnapshot, collection, getDocs } from './database';
+import { auth, db, loginWithGoogle } from './database';
 import { LogIn } from 'lucide-react';
 import { Bill, Cafe, LedgerEntry, MenuItem, PrinterConfig, TabType, WalletOpeningBalances } from './types';
 import {
@@ -89,180 +89,74 @@ export default function App() {
     };
 
     window.addEventListener('app_toast', handleToast);
+    const query = new URLSearchParams(window.location.search);
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const loginError = query.get('error_description') || fragment.get('error_description');
+    if (loginError) {
+      showToast(`Google login: ${loginError}`, 'error');
+      history.replaceState(null, '', window.location.pathname);
+    }
     return () => window.removeEventListener('app_toast', handleToast);
   }, []);
 
-  // Initialize Firebase and check user places on login
+  // Restore only cafes that the signed-in user can read under database policies.
   useEffect(() => {
-    testConnection();
-
+    let generation = 0;
     const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
+      const currentGeneration = ++generation;
       setUser(currentUser);
-      const currentLocal = getActiveCafe();
-
-      if (currentUser) {
-        try {
-          let matchedCafe: Cafe | null = null;
-
-          // 1. Direct check: If we have an active local restaurant in localStorage
-          if (currentLocal && currentLocal.id !== 'default-corner-cafe') {
-            try {
-              const directDoc = await getDoc(doc(db, 'cafes', currentLocal.id));
-              if (directDoc.exists()) {
-                const cloudData = { ...directDoc.data(), id: directDoc.id } as Cafe;
-                const isOwner = cloudData.ownerId === currentUser.uid;
-                const isMember = cloudData.memberUids?.includes(currentUser.uid);
-                const isEmailMatch = currentUser.email && cloudData.ownerEmail === currentUser.email;
-                const isGuestDoc =
-                  cloudData.ownerId === 'guest-owner' ||
-                  cloudData.ownerId === 'guest-cashier' ||
-                  !cloudData.ownerId;
-
-                if (isOwner || isMember || isEmailMatch || isGuestDoc) {
-                  const updatedUids = Array.from(
-                    new Set([...(cloudData.memberUids || []), currentUser.uid])
-                  );
-                  const updatedCafe: Cafe = {
-                    ...cloudData,
-                    ownerId: isGuestDoc || isEmailMatch ? currentUser.uid : cloudData.ownerId,
-                    ownerEmail: cloudData.ownerEmail || currentUser.email || '',
-                    memberUids: updatedUids,
-                    updatedAt: new Date().toISOString(),
-                  };
-                  try {
-                    await setDoc(doc(db, 'cafes', currentLocal.id), cleanFirestoreData(updatedCafe), {
-                      merge: true,
-                    });
-                  } catch (e) {
-                    console.warn('Membership sync to Firestore warning', e);
-                  }
-                  matchedCafe = updatedCafe;
-                }
-              } else {
-                // Doc doesn't exist in Firestore yet (e.g. created locally in guest mode or offline)
-                // Register and upload it directly to Firestore under this Google account!
-                const initialMember = {
-                  uid: currentUser.uid,
-                  email: currentUser.email || '',
-                  name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Owner',
-                  role: 'owner' as const,
-                  joinedAt: new Date().toISOString(),
-                };
-
-                const claimedCafe: Cafe = {
-                  ...currentLocal,
-                  ownerId: currentUser.uid,
-                  ownerEmail: currentUser.email || '',
-                  memberUids: [currentUser.uid],
-                  members: [initialMember],
-                  updatedAt: new Date().toISOString(),
-                };
-
-                try {
-                  await setDoc(doc(db, 'cafes', claimedCafe.id), cleanFirestoreData(claimedCafe));
-                  console.log(`Uploaded local restaurant "${claimedCafe.name}" to cloud for ${currentUser.email}`);
-                } catch (saveErr) {
-                  console.warn('Could not register local cafe to account in Firestore', saveErr);
-                }
-                matchedCafe = claimedCafe;
-              }
-            } catch (err) {
-              console.warn('Error verifying local cafe in Firestore', err);
-              matchedCafe = currentLocal;
-            }
-          }
-
-          // 2. If matchedCafe not established yet, search cafes in Firestore
-          if (!matchedCafe) {
-            const ownerQuery = query(collection(db, 'cafes'), where('ownerId', '==', currentUser.uid));
-            const memberQuery = query(
-              collection(db, 'cafes'),
-              where('memberUids', 'array-contains', currentUser.uid)
-            );
-
-            const [ownerSnap, memberSnap] = await Promise.all([getDocs(ownerQuery), getDocs(memberQuery)]);
-
-            if (!ownerSnap.empty) {
-              matchedCafe = { ...ownerSnap.docs[0].data(), id: ownerSnap.docs[0].id } as Cafe;
-            } else if (!memberSnap.empty) {
-              matchedCafe = { ...memberSnap.docs[0].data(), id: memberSnap.docs[0].id } as Cafe;
-            } else if (currentUser.email) {
-              const emailSnap = await getDocs(
-                query(collection(db, 'cafes'), where('ownerEmail', '==', currentUser.email))
-              );
-              if (!emailSnap.empty) {
-                matchedCafe = { ...emailSnap.docs[0].data(), id: emailSnap.docs[0].id } as Cafe;
-              }
-            }
-          }
-
-          // 3. Apply matched or local cafe
-          if (matchedCafe) {
-            setActiveCafe(matchedCafe);
-            setCafeState(matchedCafe);
-            setIsInitialSetup(false);
-            setShowCafeModal(false);
-            showToast(`Loaded restaurant: ${matchedCafe.name}`, 'success');
-          } else if (currentLocal && currentLocal.id !== 'default-corner-cafe') {
-            // Local cafe exists and user is actively working on it -> register it!
-            const claimedCafe: Cafe = {
-              ...currentLocal,
-              ownerId: currentUser.uid,
-              ownerEmail: currentUser.email || '',
-              memberUids: Array.from(new Set([...(currentLocal.memberUids || []), currentUser.uid])),
-              updatedAt: new Date().toISOString(),
-            };
-            try {
-              await setDoc(doc(db, 'cafes', claimedCafe.id), cleanFirestoreData(claimedCafe));
-            } catch (e) {
-              console.warn('Error saving claimed cafe', e);
-            }
-            setActiveCafe(claimedCafe);
-            setCafeState(claimedCafe);
-            setIsInitialSetup(false);
-            setShowCafeModal(false);
-          } else {
-            // Truly a brand new user with no existing place anywhere
-            setIsInitialSetup(true);
-            setShowCafeModal(true);
-          }
-        } catch (err) {
-          console.warn('Error querying user cafes', err);
-          if (currentLocal) {
-            setCafeState(currentLocal);
-            setIsInitialSetup(false);
-            setShowCafeModal(false);
-          }
-        }
-      } else {
-        // User logged out or guest: DO NOT destroy current local cafe if one is already in use!
-        if (currentLocal) {
-          setCafeState(currentLocal);
+      setReceiptBill(null);
+      setShowExpensesDrawer(false);
+      syncEngine.setCafe(null);
+      const local = getActiveCafe();
+      const belongsToUser = currentUser && local &&
+        (local.ownerId === currentUser.uid || local.memberUids?.includes(currentUser.uid));
+      const fallback = belongsToUser ? local : createDefaultCafe();
+      setActiveCafe(fallback);
+      setCafeState(fallback);
+      setShowCafeModal(false);
+      if (!currentUser) return;
+      try {
+        const available = await getDocs(collection(db, 'cafes'));
+        if (currentGeneration !== generation) return;
+        const cafes = available.docs.map(d => ({ ...d.data(), id: d.id } as Cafe));
+        const selected = cafes.find(c => c.id === local?.id) || cafes[0];
+        if (selected) {
+          setActiveCafe(selected);
+          setCafeState(selected);
+          setIsInitialSetup(false);
         } else {
-          const defaultCafe = createDefaultCafe();
-          setActiveCafe(defaultCafe);
-          setCafeState(defaultCafe);
+          const empty = createDefaultCafe();
+          setActiveCafe(empty);
+          setCafeState(empty);
+          setIsInitialSetup(true);
+          setShowCafeModal(true);
         }
-        setIsInitialSetup(false);
-        setShowCafeModal(false);
+      } catch (error: any) {
+        showToast(`Could not load restaurants: ${error.message}. Local offline data is still available.`, 'warning');
       }
     });
-
-    return () => unsubAuth();
+    return () => { generation++; unsubAuth(); };
   }, []);
 
   // Real-time listener for current Cafe document (for live approvals & updates)
   useEffect(() => {
-    if (!activeCafe.id || activeCafe.id === 'default-corner-cafe') return;
+    if (!user || !activeCafe.id || activeCafe.id === 'default-corner-cafe') return;
 
     try {
       const unsubCafe = onSnapshot(doc(db, 'cafes', activeCafe.id), (docSnap) => {
+        if (!docSnap.exists()) {
+          const empty = createDefaultCafe();
+          setActiveCafe(empty);
+          setCafeState(empty);
+          setIsInitialSetup(true);
+          setShowCafeModal(true);
+          return;
+        }
         if (docSnap.exists()) {
           const cloudCafe = { ...docSnap.data(), id: docSnap.id } as Cafe;
           const isOwnerMatch =
-            (user && cloudCafe.ownerId === user.uid) ||
-            (user?.email && cloudCafe.ownerEmail === user.email) ||
-            user?.email === 'rajtiwari07102001@gmail.com';
+            user && cloudCafe.ownerId === user.uid;
           const isMemberMatch = user && cloudCafe.memberUids?.includes(user.uid);
 
           // Only revoke if user is confirmed NOT the owner and not in members list
@@ -287,17 +181,17 @@ export default function App() {
 
   // Sync Engine Cafe binding
   useEffect(() => {
-    syncEngine.setCafe(activeCafe.id);
+    syncEngine.setCafe(user && activeCafe.id !== 'default-corner-cafe' ? activeCafe.id : null);
     setMenu(getLocalMenu(activeCafe.id));
     setBills(getLocalBills(activeCafe.id));
     setLedger(getLocalLedger(activeCafe.id));
     setOpeningBalances(getWalletOpeningBalances(activeCafe.id));
     setPendingCount(getPendingQueue(activeCafe.id).length);
-  }, [activeCafe.id]);
+  }, [activeCafe.id, user?.uid]);
 
   // Real-time multi-device sync for Menu items subcollection
   useEffect(() => {
-    if (!activeCafe.id || activeCafe.id === 'default-corner-cafe') return;
+    if (!user || !activeCafe.id || activeCafe.id === 'default-corner-cafe') return;
 
     try {
       const unsubMenu = onSnapshot(
@@ -322,7 +216,7 @@ export default function App() {
     } catch (e) {
       console.warn('Error setting up menu live listener', e);
     }
-  }, [activeCafe.id]);
+  }, [activeCafe.id, user?.uid]);
 
   // Real-time multi-device sync for Ledger (Expenditures, Withdrawals, CC Top-Ups) & Wallet Opening Balances
   useEffect(() => {
@@ -466,7 +360,7 @@ export default function App() {
     }
     const synced = await syncEngine.flushPendingQueue();
     if (synced > 0) {
-      showToast(`Successfully synced ${synced} queued bills to Firestore!`, 'success');
+      showToast(`Successfully synced ${synced} queued bills to database!`, 'success');
     }
   }, [isOnline]);
 
@@ -474,7 +368,7 @@ export default function App() {
   const handleBillCreated = useCallback((newBill: Bill) => {
     setReceiptBill(newBill);
     setBills(getLocalBills(activeCafe.id));
-  }, [activeCafe.id]);
+  }, [activeCafe.id, user?.uid]);
 
   const handleCafeSelected = useCallback((newCafe: Cafe) => {
     setActiveCafe(newCafe);
@@ -530,7 +424,7 @@ export default function App() {
       )}
 
       {/* Main View Body */}
-      <main className="flex-1 pb-16 lg:pb-6">
+      <main key={`main-${activeCafe.id}`} className="flex-1 pb-16 lg:pb-6">
         {activeTab === 'pos' && (
           <BillingPOS
             cafe={activeCafe}
@@ -656,6 +550,7 @@ export default function App() {
 
       {/* Cash Counter, Expenditures, Withdrawals & Credit Card Top-Up Drawer */}
       <ExpensesDrawer
+        key={`expenses-${activeCafe.id}`}
         isOpen={showExpensesDrawer}
         onClose={() => setShowExpensesDrawer(false)}
         cafe={activeCafe}
@@ -673,7 +568,7 @@ export default function App() {
       {!isOnline && (
         <div className="fixed bottom-3 left-3 z-40 bg-amber-600 text-white px-3 py-1.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          <span>Offline Mode: Bills are saved locally & will auto-sync to Firebase.</span>
+          <span>Offline Mode: Bills are saved locally & will auto-sync to Supabase.</span>
         </div>
       )}
 

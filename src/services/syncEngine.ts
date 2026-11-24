@@ -7,8 +7,8 @@ import {
   orderBy,
   limit,
   Unsubscribe,
-} from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType, cleanFirestoreData } from '../firebase';
+} from '../database';
+import { db, auth, cleanData } from '../database';
 import { Bill, MenuItem } from '../types';
 import {
   getPendingQueue,
@@ -87,14 +87,14 @@ class SyncEngine {
     }
   }
 
-  // Push pending bills from local queue to Firestore
+  // Push pending bills from local queue to database
   public async flushPendingQueue(): Promise<number> {
     if (!this.currentCafeId || !this.isOnlineStatus || this.isSyncing) return 0;
     const cafeId = this.currentCafeId;
     const queue = getPendingQueue(cafeId);
     if (queue.length === 0) return 0;
 
-    // Check if user is signed in to write to Firestore
+    // Check if user is signed in to write to database
     if (!auth.currentUser) {
       return 0;
     }
@@ -114,7 +114,7 @@ class SyncEngine {
             isSynced: true,
             syncedAt: new Date().toISOString(),
           };
-          await setDoc(docRef, cleanFirestoreData(sanitizedBill), { merge: true });
+          await setDoc(docRef, cleanData(sanitizedBill), { merge: true });
           markBillSyncedLocally(cafeId, bill.id);
           syncedCount++;
         } catch (err) {
@@ -156,7 +156,8 @@ class SyncEngine {
         (snapshot) => {
           snapshot.docChanges().forEach((change) => {
             const billData = change.doc.data() as Bill;
-            if (change.type === 'added' || change.type === 'modified') {
+            if ((change.type === 'added' || change.type === 'modified') &&
+                !getPendingQueue(cafeId).some(b => b.id === change.doc.id)) {
               saveBillLocally({
                 ...billData,
                 id: change.doc.id,
@@ -166,7 +167,7 @@ class SyncEngine {
           });
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, billsPath);
+          console.warn('Bills subscription failed', error);
         }
       );
     } catch (err) {
@@ -179,7 +180,7 @@ class SyncEngine {
       this.menuUnsubscribe = onSnapshot(
         menuQuery,
         (snapshot) => {
-          if (!snapshot.empty) {
+          {
             const items: MenuItem[] = [];
             snapshot.forEach((docSnap) => {
               items.push({ ...(docSnap.data() as MenuItem), id: docSnap.id, cafeId });
@@ -188,7 +189,7 @@ class SyncEngine {
           }
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, menuPath);
+          console.warn('Menu subscription failed', error);
         }
       );
     } catch (err) {

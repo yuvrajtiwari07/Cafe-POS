@@ -3,7 +3,7 @@ import App from './App.tsx';
 import './index.css';
 
 // Register Service Worker for Android PWA WebAPK installation & offline caching
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
@@ -33,6 +33,15 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       .catch((error) => {
         console.warn('ServiceWorker registration error:', error);
       });
+  });
+}
+
+// A previous PWA installation must not serve stale source modules in development.
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const registration of registrations) {
+      if (registration.scope === window.location.origin + '/') void registration.unregister();
+    }
   });
 }
 

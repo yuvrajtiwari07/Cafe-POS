@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 import { Cafe, MenuItem } from '../types';
 import { saveLocalMenu } from '../services/storage';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db, auth, cleanFirestoreData } from '../firebase';
+import { doc, setDoc, deleteDoc } from '../database';
+import { db, auth, cleanData } from '../database';
 import { showToast } from '../services/toast';
 
 const COMMON_EMOJIS = ['☕', '🍵', '🥤', '🧃', '🥪', '🍟', '🍔', '🍕', '🍰', '🧁', '🍨', '🥐', '🍛', '🍜', '🥗', '🍪', '🧇', '🥞', '🍩', '🍫'];
@@ -115,13 +115,13 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
     saveLocalMenu(cafe.id, updated);
     onMenuUpdated(updated);
 
-    // Sync to Firestore if authenticated
+    // Sync to database if authenticated
     if (auth.currentUser) {
       try {
         const docRef = doc(db, 'cafes', cafe.id, 'menu', item.id);
-        await setDoc(docRef, cleanFirestoreData({ ...item, isAvailable: !item.isAvailable }), { merge: true });
+        await setDoc(docRef, cleanData({ ...item, isAvailable: !item.isAvailable }), { merge: true });
       } catch (e) {
-        console.warn('Could not sync availability to Firestore', e);
+        console.warn('Could not sync availability to database', e);
       }
     }
   };
@@ -176,9 +176,9 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
     if (auth.currentUser) {
       try {
         const docRef = doc(db, 'cafes', cafe.id, 'menu', editingItem.id);
-        await setDoc(docRef, cleanFirestoreData(updatedItem), { merge: true });
+        await setDoc(docRef, cleanData(updatedItem), { merge: true });
       } catch (err) {
-        console.warn('Could not sync updated item to Firestore', err);
+        console.warn('Could not sync updated item to database', err);
       }
     }
 
@@ -199,10 +199,10 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
         const item = updated.find((m) => m.id === itemId);
         if (item) {
           const docRef = doc(db, 'cafes', cafe.id, 'menu', itemId);
-          await setDoc(docRef, cleanFirestoreData(item), { merge: true });
+          await setDoc(docRef, cleanData(item), { merge: true });
         }
       } catch (e) {
-        console.warn('Could not sync price to Firestore', e);
+        console.warn('Could not sync price to database', e);
       }
     }
     showToast('Price updated', 'success');
@@ -236,9 +236,9 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
     if (auth.currentUser) {
       try {
         const docRef = doc(db, 'cafes', cafe.id, 'menu', newItem.id);
-        await setDoc(docRef, cleanFirestoreData(newItem));
+        await setDoc(docRef, cleanData(newItem));
       } catch (err) {
-        console.warn('Could not sync new item to Firestore', err);
+        console.warn('Could not sync new item to database', err);
       }
     }
 
@@ -267,7 +267,7 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
         const docRef = doc(db, 'cafes', cafe.id, 'menu', item.id);
         await deleteDoc(docRef);
       } catch (err) {
-        console.warn('Could not delete item from Firestore', err);
+        console.warn('Could not delete item from database', err);
       }
     }
   };
@@ -288,7 +288,7 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
           await deleteDoc(docRef);
         }
       } catch (err) {
-        console.warn('Could not clear items in Firestore', err);
+        console.warn('Could not clear items in database', err);
       }
     }
   };
@@ -430,11 +430,11 @@ export const MenuManager: React.FC<MenuManagerProps> = ({
       saveLocalMenu(cafe.id, updated);
       onMenuUpdated(updated);
 
-      // Sync each item to Firestore so other devices receive it via onSnapshot
+      // Sync each item to database so other devices receive it via onSnapshot
       if (auth.currentUser) {
         await Promise.all(
           uniqueNewItems.map((itm) =>
-            setDoc(doc(db, 'cafes', cafe.id, 'menu', itm.id), cleanFirestoreData(itm))
+            setDoc(doc(db, 'cafes', cafe.id, 'menu', itm.id), cleanData(itm))
           )
         );
       }

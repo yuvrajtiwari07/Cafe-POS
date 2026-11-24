@@ -17,8 +17,7 @@ import {
 import {
   connectGoogleSheets,
   hasGoogleSheetsAccessToken,
-} from '../firebase';
-import { INITIAL_EXPENSE_SEED_ROWS } from '../data/initialExpensesSeed';
+} from '../database';
 import {
   applyPullFromSheets,
   createCafeBackupWorkbook,
@@ -27,7 +26,6 @@ import {
   linkExistingSpreadsheet,
   previewPullFromSheets,
   pushFullBackupToSheets,
-  seedInitialExpensesToDbAndSheet,
   SheetPullPreview,
 } from '../services/googleSheetsSync';
 import { showToast } from '../services/toast';
@@ -44,18 +42,8 @@ interface GoogleSheetsSyncPanelProps {
 
 type ConfirmModalKind =
   | { type: 'create_sheet' }
-  | { type: 'seed_expenses' }
   | { type: 'push_full' }
   | { type: 'pull_reconcile'; preview: SheetPullPreview };
-
-const SEED_PAYEE_BREAKDOWN = [
-  { name: 'Ishita', amount: 138947.0, note: 'Partner (tracked separately)' },
-  { name: 'Prateek', amount: 125474.5, note: 'Partner (tracked separately)' },
-  { name: 'Cafe', amount: 43905.22, note: 'Cash ₹8,756 · UPI ₹21,599 · CC ₹13,550.22' },
-  { name: 'Yash', amount: 24498.0, note: 'Partner (tracked separately)' },
-  { name: 'Ankit', amount: 1504.0, note: 'Partner (tracked separately)' },
-  { name: 'Yuvraj', amount: 483.0, note: 'Partner (tracked separately)' },
-];
 
 function GoogleLogoSvg() {
   return (
@@ -96,9 +84,6 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
   const [linkInput, setLinkInput] = useState('');
   const [showLinkBox, setShowLinkBox] = useState(false);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalKind | null>(null);
-
-  const existingSeedCount = ledger.filter((e) => e.id.startsWith('seed-exp-')).length;
-  const isFullySeeded = existingSeedCount >= INITIAL_EXPENSE_SEED_ROWS.length;
 
   useEffect(() => {
     const syncAuth = () => setSheetsConnected(hasGoogleSheetsAccessToken());
@@ -223,26 +208,6 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
         showToast(`Created "${meta.title}" with All Sales, Daily Tabs & Expenses`, 'success');
       } catch (err: any) {
         showToast(err?.message || 'Failed to create Google Sheet', 'error');
-      } finally {
-        setBusyAction(null);
-      }
-      return;
-    }
-
-    if (action.type === 'seed_expenses') {
-      setBusyAction('seed_expenses');
-      try {
-        const res = await seedInitialExpensesToDbAndSheet(cafe, ledger);
-        onLedgerUpdated(res.updatedLedger);
-        onCafeUpdated(res.updatedCafe);
-        showToast(
-          res.syncedToSheet
-            ? `Imported ${res.addedCount} expense rows into Firestore & synced to Google Sheet`
-            : `Imported ${res.addedCount} expense rows into Firestore (${res.skippedCount} already existed)`,
-          'success'
-        );
-      } catch (err: any) {
-        showToast(err?.message || 'Failed to import historical expenses', 'error');
       } finally {
         setBusyAction(null);
       }
@@ -461,41 +426,6 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
           </div>
         )}
 
-        {/* Historical Expense Seed Banner */}
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-amber-700 shrink-0" />
-              <span className="text-sm font-bold text-stone-900">
-                Historical Expense Sheet Import (162 rows · ₹3,34,811.72)
-              </span>
-              {isFullySeeded && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Imported ({existingSeedCount}/162)
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-stone-600">
-              Imports all 162 rows (Sep 30 – Nov 22, 2026) from your attached Expense Sheet into Firestore
-              {cafe.googleSpreadsheetId ? ' and your Google Sheet' : ''}. Only Cafe-paid rows (₹43,905.22) affect live Cafe wallets; partner spends are tracked separately.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={busyAction !== null}
-            onClick={() => setConfirmModal({ type: 'seed_expenses' })}
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-40 transition-colors"
-          >
-            {busyAction === 'seed_expenses' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Database className="w-3.5 h-3.5" />
-            )}
-            {isFullySeeded ? 'Re-verify & Sync Seed' : 'Import 162 Expense Rows'}
-          </button>
-        </div>
-
         {/* Sync Controls */}
         {cafe.googleSpreadsheetId && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -560,7 +490,6 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
                 <h4 className="text-sm font-bold text-stone-900">
                   {confirmModal.type === 'create_sheet' && 'Create New Google Sheets Backup Workbook?'}
-                  {confirmModal.type === 'seed_expenses' && 'Import 162 Historical Expenses?'}
                   {confirmModal.type === 'push_full' && 'Overwrite Google Sheet with POS Database?'}
                   {confirmModal.type === 'pull_reconcile' && 'Apply Google Sheet Changes to POS Database?'}
                 </h4>
@@ -595,36 +524,7 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
                       <strong>Expenses &amp; Withdrawals</strong> tab ({ledger.length} current entries) with live Payee &amp; Category SUMIFS tables
                     </li>
                   </ul>
-                  {!isFullySeeded && (
-                    <p className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-                      Tip: You can also click <strong>Import 162 Expense Rows</strong> right after creating the sheet (or before) to populate all Sep–Nov historical expenses into both Firestore and the Sheet.
-                    </p>
-                  )}
-                </>
-              )}
 
-              {confirmModal.type === 'seed_expenses' && (
-                <>
-                  <p>
-                    This will import all <strong>162 valid rows</strong> (Sep 30 – Nov 22, 2026; exact sum{' '}
-                    <strong className="tabular-nums text-stone-900">₹3,34,811.72</strong>) into Firestore using deterministic IDs so existing entries are never duplicated
-                    {cafe.googleSpreadsheetId && sheetsConnected
-                      ? ', and immediately sync the Expenses & Withdrawals tab in your Google Sheet.'
-                      : '.'}
-                  </p>
-                  <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
-                    {SEED_PAYEE_BREAKDOWN.map((p) => (
-                      <div key={p.name} className="px-3 py-2 flex items-center justify-between bg-stone-50/50">
-                        <div>
-                          <span className="font-bold text-stone-900">{p.name}</span>
-                          <span className="ml-2 text-[11px] text-stone-500">{p.note}</span>
-                        </div>
-                        <span className="font-bold tabular-nums text-stone-900">
-                          ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
                 </>
               )}
 
@@ -640,7 +540,7 @@ export const GoogleSheetsSyncPanel: React.FC<GoogleSheetsSyncPanelProps> = ({
                 <>
                   <p>
                     Scanned <strong>{confirmModal.preview.scannedSalesRows}</strong> sales rows and{' '}
-                    <strong>{confirmModal.preview.scannedExpenseRows}</strong> expense rows from your Google Sheet. Confirming will apply these changes to Firestore:
+                    <strong>{confirmModal.preview.scannedExpenseRows}</strong> expense rows from your Google Sheet. Confirming will apply these changes to database:
                   </p>
                   <div className="grid grid-cols-2 gap-2.5">
                     <div className="rounded-xl border border-stone-200 p-3 bg-stone-50">

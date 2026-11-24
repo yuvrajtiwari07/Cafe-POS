@@ -28,8 +28,8 @@ import {
   saveMovementLocally,
   convertUnits,
 } from '../services/inventoryEngine';
-import { db, cleanFirestoreData } from '../firebase';
-import { doc, collection, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, cleanData } from '../database';
+import { doc, collection, onSnapshot, setDoc, deleteDoc } from '../database';
 import { showToast } from '../services/toast';
 
 interface InventoryManagerProps {
@@ -73,7 +73,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
   // Delete Item Safety Warning
   const [itemToDelete, setItemToDelete] = useState<{ item: InventoryItem; mappedDishes: string[] } | null>(null);
 
-  // Real-time Firestore sync
+  // Real-time database sync
   useEffect(() => {
     if (!cafe.id || cafe.id === 'default-corner-cafe') return;
 
@@ -161,9 +161,9 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id, 'inventory', newItem.id), cleanFirestoreData(newItem), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id, 'inventory', newItem.id), cleanData(newItem), { merge: true });
       } catch (e) {
-        console.warn('Firestore inventory save error', e);
+        console.warn('database inventory save error', e);
       }
     }
 
@@ -221,7 +221,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
       try {
         await deleteDoc(doc(db, 'cafes', cafe.id, 'inventory', itemId));
       } catch (e) {
-        console.warn('Firestore delete error', e);
+        console.warn('database delete error', e);
       }
     }
 
@@ -272,8 +272,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id, 'inventory', updatedItem.id), cleanFirestoreData(updatedItem), { merge: true });
-        await setDoc(doc(db, 'cafes', cafe.id, 'inventoryMovements', movement.id), cleanFirestoreData(movement));
+        await setDoc(doc(db, 'cafes', cafe.id, 'inventory', updatedItem.id), cleanData(updatedItem), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id, 'inventoryMovements', movement.id), cleanData(movement));
       } catch (e) {
         console.warn('Adjustment sync error', e);
       }
@@ -345,7 +345,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id, 'recipes', selectedMenuDishId), cleanFirestoreData(updatedRecipe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id, 'recipes', selectedMenuDishId), cleanData(updatedRecipe), { merge: true });
       } catch (e) {
         console.warn('Recipe save error', e);
       }
@@ -370,7 +370,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ cafe, menu, 
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id, 'recipes', selectedMenuDishId), cleanFirestoreData(updatedRecipe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id, 'recipes', selectedMenuDishId), cleanData(updatedRecipe), { merge: true });
       } catch (e) {
         console.warn('Recipe update error', e);
       }

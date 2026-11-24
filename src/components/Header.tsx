@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Cafe, TabType } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { auth, loginWithGoogle, logoutUser } from '../firebase';
+import { auth, loginWithGoogle, logoutUser } from '../database';
 
 interface HeaderProps {
   cafe: Cafe;
@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
             }`}
-            title="Real-time Firestore Database Status (Click to flush queue)"
+            title="Real-time database Database Status (Click to flush queue)"
           >
             {isSyncing ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#ea580c]" />

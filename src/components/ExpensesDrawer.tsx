@@ -23,7 +23,7 @@ import {
   Database,
   Loader2,
 } from 'lucide-react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from '../database';
 import {
   Bill,
   Cafe,
@@ -33,11 +33,9 @@ import {
   LedgerPaymentMode,
   WalletOpeningBalances,
 } from '../types';
-import { auth, db, cleanFirestoreData, handleFirestoreError, OperationType } from '../firebase';
-import { INITIAL_EXPENSE_SEED_ROWS } from '../data/initialExpensesSeed';
+import { auth, db, cleanData, handleDatabaseError, OperationType } from '../database';
 import {
   deleteLedgerEntryFromSheets,
-  seedInitialExpensesToDbAndSheet,
   syncLedgerEntryToSheets,
 } from '../services/googleSheetsSync';
 import { saveLocalLedger, saveWalletOpeningBalances } from '../services/storage';
@@ -109,10 +107,8 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
   const [note, setNote] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Inline confirmations & seed import state
+  // Inline confirmations
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [showSeedConfirm, setShowSeedConfirm] = useState<boolean>(false);
-  const [isSeeding, setIsSeeding] = useState<boolean>(false);
 
   // History filtering state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -120,11 +116,6 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
   const [modeFilter, setModeFilter] = useState<'all' | LedgerPaymentMode>('all');
   const [payeeFilter, setPayeeFilter] = useState<string>('all');
   const [historyScope, setHistoryScope] = useState<'selected_date' | 'all_dates'>('all_dates');
-
-  const existingSeedCount = useMemo(
-    () => ledger.filter((e) => e.id.startsWith('seed-exp-')).length,
-    [ledger]
-  );
 
   useEffect(() => {
     const bizDate = getCurrentBusinessDateStr(cafe.openingTime, cafe.closingTime);
@@ -218,10 +209,10 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
     if (auth.currentUser && cafe.id && cafe.id !== 'default-corner-cafe') {
       const settingsPath = `cafes/${cafe.id}/settings/wallet`;
       try {
-        await setDoc(doc(db, 'cafes', cafe.id, 'settings', 'wallet'), cleanFirestoreData(updated));
+        await setDoc(doc(db, 'cafes', cafe.id, 'settings', 'wallet'), cleanData(updated));
       } catch (err) {
         console.warn('Wallet opening balance cloud sync error', err);
-        handleFirestoreError(err, OperationType.WRITE, settingsPath);
+        handleDatabaseError(err, OperationType.WRITE, settingsPath);
       }
     }
 
@@ -358,11 +349,11 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
         try {
           await setDoc(
             doc(db, 'cafes', cafe.id, 'ledger', savedEntry.id),
-            cleanFirestoreData(savedEntry),
+            cleanData(savedEntry),
             { merge: true }
           );
         } catch (err) {
-          handleFirestoreError(err, editingEntry ? OperationType.UPDATE : OperationType.CREATE, ledgerPath);
+          handleDatabaseError(err, editingEntry ? OperationType.UPDATE : OperationType.CREATE, ledgerPath);
         }
       }
 
@@ -403,34 +394,14 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
       try {
         await deleteDoc(doc(db, 'cafes', cafe.id, 'ledger', entry.id));
       } catch (err) {
-        console.warn('Could not delete ledger entry in Firestore', err);
-        handleFirestoreError(err, OperationType.DELETE, ledgerPath);
+        console.warn('Could not delete ledger entry in database', err);
+        handleDatabaseError(err, OperationType.DELETE, ledgerPath);
       }
     }
 
     // Auto-delete row from linked Google Sheet
     deleteLedgerEntryFromSheets(cafe, entry.id).catch(() => {});
     showToast('Ledger entry removed', 'info');
-  };
-
-  const handleSeedInitialExpenses = async () => {
-    setShowSeedConfirm(false);
-    setIsSeeding(true);
-    try {
-      const res = await seedInitialExpensesToDbAndSheet(cafe, ledger);
-      onLedgerUpdated(res.updatedLedger);
-      onCafeUpdated?.(res.updatedCafe);
-      showToast(
-        res.syncedToSheet
-          ? `Imported ${res.addedCount} expense rows into Firestore & synced to Google Sheet!`
-          : `Imported ${res.addedCount} expense rows into Firestore (${res.skippedCount} already present).`,
-        'success'
-      );
-    } catch (err: any) {
-      showToast(err?.message || 'Could not import historical expenses', 'error');
-    } finally {
-      setIsSeeding(false);
-    }
   };
 
   const handleExportLedgerCSV = () => {
@@ -542,7 +513,7 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
-          {/* Compact Google Sheets Backup & Historical Seed Strip */}
+          {/* Compact Google Sheets Backup */}
           <div className="bg-[#fffbf5] px-3.5 py-2.5 rounded-2xl border border-[#eedecb] flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 min-w-0">
               <FileSpreadsheet className="w-4 h-4 text-emerald-700 shrink-0" />
@@ -554,18 +525,6 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {existingSeedCount < INITIAL_EXPENSE_SEED_ROWS.length && (
-                <button
-                  type="button"
-                  disabled={isSeeding}
-                  onClick={() => setShowSeedConfirm((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[11px] transition cursor-pointer"
-                >
-                  {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-                  <span>Import 162 Sheet Rows</span>
-                </button>
-              )}
-
               {cafe.googleSpreadsheetUrl ? (
                 <a
                   href={cafe.googleSpreadsheetUrl}
@@ -592,34 +551,6 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
               )}
             </div>
           </div>
-
-          {showSeedConfirm && (
-            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 text-xs space-y-2">
-              <div className="font-bold text-amber-950">
-                Confirm importing 162 historical expense rows (₹3,34,811.72)?
-              </div>
-              <p className="text-amber-900/90 leading-relaxed">
-                Imports Sep 30 – Nov 22, 2026 rows into Firestore{cafe.googleSpreadsheetId ? ' and syncs your Google Sheet' : ''}. Only Cafe-paid rows (₹43,905.22) affect Cash/UPI/CC wallets; partner spends (₹2,90,906.50) are tracked separately below.
-              </p>
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowSeedConfirm(false)}
-                  className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-950 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isSeeding}
-                  onClick={handleSeedInitialExpenses}
-                  className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold cursor-pointer"
-                >
-                  {isSeeding ? 'Importing...' : 'Confirm Import'}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* View Toggle: Cumulative vs Daily */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#fffbf5] p-3 rounded-2xl border border-[#eedecb]">
@@ -936,7 +867,7 @@ export const ExpensesDrawer: React.FC<ExpensesDrawerProps> = ({
                 </button>
               ) : (
                 <span className="text-[11px] text-[#7d6e67]">
-                  Syncs to Firestore{cafe.googleSpreadsheetId ? ' & Google Sheet' : ''}
+                  Syncs to database{cafe.googleSpreadsheetId ? ' & Google Sheet' : ''}
                 </span>
               )}
             </div>

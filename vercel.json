@@ -1,0 +1,19 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/download/android",
+      "destination": "/downloads/corner-cafe-pos-android.zip"
+    },
+    {
+      "source": "/download/corner-cafe-pos-android.zip",
+      "destination": "/downloads/corner-cafe-pos-android.zip"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

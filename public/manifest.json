@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Corner Cafe POS & Billing",
   "short_name": "CafePOS",
-  "description": "Multi-platform cafe and restaurant billing POS with real-time Firebase sync and Bluetooth thermal printing.",
+  "description": "Multi-platform cafe and restaurant billing POS with real-time Supabase sync and Bluetooth thermal printing.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

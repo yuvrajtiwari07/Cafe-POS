@@ -15,12 +15,13 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: false,
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
           name: 'Corner Cafe POS & Billing',
           short_name: 'CafePOS',
-          description: 'Multi-platform cafe and restaurant billing POS with real-time Firebase sync and Bluetooth thermal printing.',
+          description: 'Multi-platform cafe and restaurant billing POS with real-time Supabase sync and Bluetooth thermal printing.',
           theme_color: '#e65c00',
           background_color: '#fbf6ee',
           display: 'standalone',
@@ -52,7 +53,7 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
       }),
     ],

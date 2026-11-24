@@ -9,9 +9,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
+async function createApp() {
   const app = express();
-  const PORT = 3000;
 
   app.use(express.json({ limit: '20mb' }));
 
@@ -131,7 +130,7 @@ Return a strictly valid JSON array of these objects.`;
 
   // Serve static files from public folder with correct MIME types
   app.use(
-    express.static(path.resolve(__dirname, 'public'), {
+    express.static(path.resolve(__dirname, process.env.NODE_ENV === 'production' ? 'dist' : 'public'), {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.webmanifest') || filePath.endsWith('manifest.json')) {
           res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
@@ -153,7 +152,7 @@ Return a strictly valid JSON array of these objects.`;
   app.get('/sw.js', (_req, res) => {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Service-Worker-Allowed', '/');
-    res.sendFile(path.resolve(__dirname, 'public', 'sw.js'));
+    res.sendFile(path.resolve(__dirname, process.env.NODE_ENV === 'production' ? 'dist' : 'public', 'sw.js'));
   });
 
   // Android package download endpoint
@@ -163,7 +162,7 @@ Return a strictly valid JSON array of these objects.`;
   });
 
   // Development: Mount Vite in middleware mode
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
@@ -181,12 +180,11 @@ Return a strictly valid JSON array of these objects.`;
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
+  return app;
 }
 
-startServer().catch((err) => {
-  console.error('Error starting server:', err);
-  process.exit(1);
-});
+const app = await createApp();
+export default app;
+if (!process.env.VERCEL) {
+  app.listen(3000, '0.0.0.0', () => console.log('Server listening on http://localhost:3000'));
+}

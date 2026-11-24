@@ -1,5 +1,5 @@
 // Corner Cafe POS & Billing Service Worker
-const CACHE_NAME = 'corner-cafe-pos-v2';
+const CACHE_NAME = 'billdedo-supabase-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -48,20 +48,10 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Skip non-GET requests, chrome-extension, or Firebase Firestore / Auth internal network calls
-  if (request.method !== 'GET' || url.protocol.startsWith('chrome-extension')) {
-    return;
-  }
-
-  // Network-only for API endpoints and Firestore streams
-  if (
-    url.pathname.startsWith('/api/') ||
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('firebaseio.com')
-  ) {
-    return;
-  }
+  // OAuth and Supabase requests must never be intercepted or cached.
+  if (request.method !== 'GET' || url.origin !== self.location.origin ||
+      url.pathname.startsWith('/api/') || url.searchParams.has('code') ||
+      url.searchParams.has('error')) return;
 
   // HTML navigation requests: Network first with cache fallback
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {

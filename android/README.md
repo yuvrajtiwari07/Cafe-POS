@@ -4,7 +4,7 @@ This directory contains the native Android application for Corner Cafe POS & Bil
 
 ## Features
 - **Shared Codebase & Real-Time Sync**: Runs the exact same application UI, logic, and features as the Web POS.
-- **Unified Firestore Database**: All cafes, tables, menu items, bills, and stock deductions synchronize in real time across Android and Web devices.
+- **Unified Supabase Database**: All cafes, tables, menu items, bills, and stock deductions synchronize in real time across Android and Web devices.
 - **Auto-Update**: Because the Android app loads the web client with local caching, any update pushed to the web app automatically reflects inside the Android app without requiring users to reinstall an APK!
 - **AI Menu Scanning**: Seamless camera and photo gallery access for scanning and digitizing paper menus.
 - **Thermal Printing Support**: Integrated Web Bluetooth permissions for portable 58mm and 80mm wireless thermal receipt printers.

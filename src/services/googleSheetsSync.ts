@@ -1,14 +1,13 @@
-import { doc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, writeBatch } from '../database';
 import {
   auth,
   clearGoogleSheetsAccessToken,
-  cleanFirestoreData,
+  cleanData,
   db,
   getGoogleSheetsAccessToken,
-  handleFirestoreError,
+  handleDatabaseError,
   OperationType,
-} from '../firebase';
-import { buildInitialSeedLedgerEntries } from '../data/initialExpensesSeed';
+} from '../database';
 import {
   Bill,
   BillStatus,
@@ -105,14 +104,7 @@ export interface SheetPullPreview {
   scannedExpenseRows: number;
 }
 
-export interface SeedImportResult {
-  addedCount: number;
-  skippedCount: number;
-  totalLedgerCount: number;
-  syncedToSheet: boolean;
-  updatedLedger: LedgerEntry[];
-  updatedCafe: Cafe;
-}
+
 
 // ---------------------------------------------------------------------------
 // Formatting & parsing helpers
@@ -362,7 +354,7 @@ function parseNumberCell(raw: unknown): number {
 // ---------------------------------------------------------------------------
 
 function queueKey(cafeId: string): string {
-  return `corner_sheets_queue_${cafeId}`;
+  return `billdedo_sb1_sheets_queue_${cafeId}`;
 }
 
 export function getPendingSheetSyncQueue(cafeId: string): SheetSyncQueueOp[] {
@@ -674,12 +666,12 @@ async function persistCafeSheetMetadata(cafe: Cafe, patch: Partial<Cafe>): Promi
   setActiveCafe(updatedCafe);
   if (auth.currentUser && cafe.id && cafe.id !== 'default-corner-cafe') {
     try {
-      await updateDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData({
+      await updateDoc(doc(db, 'cafes', cafe.id), cleanData({
         ...patch,
         updatedAt: updatedCafe.updatedAt,
       }));
     } catch (err) {
-      console.warn('Could not persist Google Sheet metadata to Firestore immediately', err);
+      console.warn('Could not persist Google Sheet metadata to database immediately', err);
     }
   }
   return updatedCafe;
@@ -1109,7 +1101,7 @@ export async function flushSheetSyncQueue(
 }
 
 // ---------------------------------------------------------------------------
-// Pull & Reconcile from Google Sheets -> Firestore + LocalStorage
+// Pull & Reconcile from Google Sheets -> database + LocalStorage
 // ---------------------------------------------------------------------------
 
 export async function previewPullFromSheets(
@@ -1359,14 +1351,14 @@ async function commitInBatches(
     chunk.forEach((op) => {
       batch.set(
         doc(db, 'cafes', cafeId, op.collectionName, op.id),
-        cleanFirestoreData(op.payload),
+        cleanData(op.payload),
         { merge: true }
       );
     });
     try {
       await batch.commit();
     } catch (err) {
-      handleFirestoreError(
+      handleDatabaseError(
         err,
         OperationType.WRITE,
         `cafes/${cafeId}/${chunk[0]?.collectionName || 'batch'}`
@@ -1422,7 +1414,7 @@ export async function applyPullFromSheets(
   const updatedBills = Array.from(billMap.values()).sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
   );
-  localStorage.setItem(`corner_bills_${cafe.id}`, JSON.stringify(updatedBills));
+  localStorage.setItem(`billdedo_sb1_bills_${cafe.id}`, JSON.stringify(updatedBills));
   window.dispatchEvent(new CustomEvent('bills_updated'));
 
   const ledgerMap = new Map(currentLedger.map((e) => [e.id, e]));
@@ -1439,73 +1431,15 @@ export async function applyPullFromSheets(
   return { updatedBills, updatedLedger, updatedCafe };
 }
 
-// ---------------------------------------------------------------------------
-// Seed Historical 162 Expense Rows into Firestore + LocalStorage + Google Sheet
-// ---------------------------------------------------------------------------
-
-export async function seedInitialExpensesToDbAndSheet(
-  cafe: Cafe,
-  currentLedger: LedgerEntry[]
-): Promise<SeedImportResult> {
-  const seedEntries = buildInitialSeedLedgerEntries(cafe.id);
-  const existingIds = new Set(currentLedger.map((e) => e.id));
-  const missingEntries = seedEntries.filter((e) => !existingIds.has(e.id));
-
-  if (missingEntries.length > 0) {
-    await commitInBatches(
-      cafe.id,
-      missingEntries.map((entry) => ({
-        collectionName: 'ledger' as const,
-        id: entry.id,
-        payload: entry,
-      }))
-    );
-  }
-
-  const mergedMap = new Map<string, LedgerEntry>();
-  currentLedger.forEach((e) => mergedMap.set(e.id, e));
-  missingEntries.forEach((e) => mergedMap.set(e.id, e));
-  const updatedLedger = Array.from(mergedMap.values()).sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt)
-  );
-  saveLocalLedger(cafe.id, updatedLedger);
-
-  let updatedCafe = await persistCafeSheetMetadata(cafe, {
-    initialExpensesSeededAt: new Date().toISOString(),
-  });
-
-  // Also sync to Google Sheet if linked and connected
-  let syncedToSheet = false;
-  if (updatedCafe.googleSpreadsheetId && getGoogleSheetsAccessToken()) {
-    try {
-      const localBills = getLocalBills(cafe.id);
-      const res = await pushFullBackupToSheets(updatedCafe, localBills, updatedLedger);
-      updatedCafe = res.updatedCafe;
-      syncedToSheet = true;
-    } catch (err) {
-      console.warn('Historical expenses seeded to DB, but Google Sheet push failed', err);
-    }
-  }
-
-  return {
-    addedCount: missingEntries.length,
-    skippedCount: seedEntries.length - missingEntries.length,
-    totalLedgerCount: updatedLedger.length,
-    syncedToSheet,
-    updatedLedger,
-    updatedCafe,
-  };
-}
-
-// Helper for single Firestore ledger upsert if needed
-export async function upsertLedgerEntryFirestore(entry: LedgerEntry): Promise<void> {
+// Helper for single database ledger upsert if needed
+export async function upsertLedgerEntrydatabase(entry: LedgerEntry): Promise<void> {
   if (!auth.currentUser || !entry.cafeId || entry.cafeId === 'default-corner-cafe') return;
   const path = `cafes/${entry.cafeId}/ledger/${entry.id}`;
   try {
-    await setDoc(doc(db, 'cafes', entry.cafeId, 'ledger', entry.id), cleanFirestoreData(entry), {
+    await setDoc(doc(db, 'cafes', entry.cafeId, 'ledger', entry.id), cleanData(entry), {
       merge: true,
     });
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, path);
+    handleDatabaseError(err, OperationType.WRITE, path);
   }
 }

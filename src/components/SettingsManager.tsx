@@ -13,8 +13,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { Bill, Cafe, InventoryMode, LedgerEntry, PrinterConfig } from '../types';
-import { db, cleanFirestoreData } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { db, cleanData } from '../database';
+import { doc, setDoc } from '../database';
 import { showToast } from '../services/toast';
 import { GoogleSheetsSyncPanel } from './GoogleSheetsSyncPanel';
 import {
@@ -79,7 +79,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   const [openingTime, setOpeningTime] = useState<string>(cafe.openingTime || DEFAULT_OPENING_TIME);
   const [closingTime, setClosingTime] = useState<string>(cafe.closingTime || DEFAULT_CLOSING_TIME);
 
-  // Sync local form state when switching cafes or receiving updated hours from Firestore
+  // Sync local form state when switching cafes or receiving updated hours from database
   useEffect(() => {
     setName(cafe.name);
     setTagline(cafe.tagline || '');
@@ -143,7 +143,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
       onPrinterConfigUpdated(updatedPrinter);
 
       if (cafe.id && cafe.id !== 'default-corner-cafe') {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       }
 
       showToast('Restaurant settings & business hours saved to cafe database!', 'success');
@@ -547,7 +547,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
           </div>
 
           <p className="text-xs text-stone-600 leading-relaxed">
-            Run Corner Cafe POS on Android phones and tablets. Real-time Firebase Firestore synchronization keeps all your cafes, tables, menu items, bills, and stock deductions identical everywhere.
+            Run Corner Cafe POS on Android phones and tablets. Real-time Supabase database synchronization keeps all your cafes, tables, menu items, bills, and stock deductions identical everywhere.
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">

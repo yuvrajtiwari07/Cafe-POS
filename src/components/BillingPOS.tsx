@@ -42,8 +42,8 @@ import {
   getCustomTables,
   saveCustomTables,
 } from '../services/storage';
-import { db, cleanFirestoreData } from '../firebase';
-import { doc, collection, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, cleanData } from '../database';
+import { doc, collection, onSnapshot, setDoc, deleteDoc } from '../database';
 import { showToast } from '../services/toast';
 import { KitchenReceiptModal } from './KitchenReceiptModal';
 import {
@@ -179,7 +179,7 @@ export const BillingPOS: React.FC<BillingPOSProps> = ({
             }
           });
 
-          // Ensure any active custom customer table from Firestore is visible in customTables
+          // Ensure any active custom customer table from database is visible in customTables
           if (activeRemoteCustomIds.length > 0) {
             setCustomTables((prev) => {
               const merged = Array.from(new Set([...prev, ...activeRemoteCustomIds]));
@@ -282,7 +282,7 @@ export const BillingPOS: React.FC<BillingPOSProps> = ({
     return billedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [billedItems]);
 
-  // Helper to commit table order changes both locally and to Firestore
+  // Helper to commit table order changes both locally and to database
   const updateActiveTable = useCallback(
     (updater: (prev: TableOrder) => TableOrder) => {
       const updated = updater(currentTableOrder);
@@ -311,16 +311,16 @@ export const BillingPOS: React.FC<BillingPOSProps> = ({
       // 2. Persist to localStorage
       saveLocalTable(cafe.id, finalized);
 
-      // 3. Broadcast to Firestore for multi-device live sync
+      // 3. Broadcast to database for multi-device live sync
       if (cafe.id && cafe.id !== 'default-corner-cafe' && user) {
         try {
           setDoc(
             doc(db, 'cafes', cafe.id, 'tables', finalized.id),
-            cleanFirestoreData(finalized),
+            cleanData(finalized),
             { merge: true }
           ).catch((e) => console.warn('Cloud table update sync warning:', e));
         } catch (e) {
-          console.warn('Firestore table setDoc error', e);
+          console.warn('database table setDoc error', e);
         }
       }
     },
@@ -421,12 +421,12 @@ export const BillingPOS: React.FC<BillingPOSProps> = ({
     // 2. Clear from localStorage
     clearLocalTable(cafe.id, tableToClear);
 
-    // 3. Clear from Firestore
+    // 3. Clear from database
     if (cafe.id && cafe.id !== 'default-corner-cafe' && user) {
       try {
         await deleteDoc(doc(db, 'cafes', cafe.id, 'tables', tableToClear));
       } catch (e) {
-        console.warn('Could not delete table doc in Firestore', e);
+        console.warn('Could not delete table doc in database', e);
       }
     }
 
@@ -713,7 +713,7 @@ export const BillingPOS: React.FC<BillingPOSProps> = ({
     setCustomTables(updated);
     saveCustomTables(cafe.id, updated);
 
-    // Remove from local tables and delete doc from Firestore
+    // Remove from local tables and delete doc from database
     await handleClearCurrentTable(custName);
 
     if (activeTableId === custName) {

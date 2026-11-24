@@ -14,8 +14,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { Cafe, StaffMember, StaffRole, JoinRequest } from '../types';
-import { db, cleanFirestoreData } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { db, cleanData } from '../database';
+import { doc, setDoc } from '../database';
 import { showToast } from '../services/toast';
 
 interface StaffManagerProps {
@@ -49,11 +49,7 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
   const handleRegenerateCode = async () => {
     setIsRegeneratingCode(true);
     try {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let newCode = 'CAFE-';
-      for (let i = 0; i < 4; i++) {
-        newCode += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      const newCode = `CAFE-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
 
       const updatedCafe: Cafe = {
         ...cafe,
@@ -62,7 +58,7 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
       };
 
       if (cafe.id && cafe.id !== 'default-corner-cafe') {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       }
 
       onCafeUpdated?.(updatedCafe);
@@ -102,9 +98,9 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       } catch (e: any) {
-        showToast('Firestore update error', 'error');
+        showToast('database update error', 'error');
         return;
       }
     }
@@ -125,7 +121,7 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       } catch (e) {
         // ignore
       }
@@ -152,7 +148,7 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       } catch (e) {
         showToast('Role update failed', 'error');
         return;
@@ -185,7 +181,7 @@ export const StaffManager: React.FC<StaffManagerProps> = ({ cafe, user, onCafeUp
 
     if (cafe.id && cafe.id !== 'default-corner-cafe') {
       try {
-        await setDoc(doc(db, 'cafes', cafe.id), cleanFirestoreData(updatedCafe), { merge: true });
+        await setDoc(doc(db, 'cafes', cafe.id), cleanData(updatedCafe), { merge: true });
       } catch (e: any) {
         showToast('Removal error', 'error');
         return;
